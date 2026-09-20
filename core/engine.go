@@ -3938,10 +3938,15 @@ func (e *Engine) getOrCreateWorkspaceAgent(workspace string) (Agent, *SessionMan
 		}
 	}
 
-	// Create per-workspace session manager
-	h := sha256.Sum256([]byte(workspace))
-	sessionFile := filepath.Join(filepath.Dir(e.sessions.StorePath()),
-		fmt.Sprintf("%s_ws_%s.json", e.name, hex.EncodeToString(h[:4])))
+	// Create per-workspace session manager. When the engine itself is not
+	// file-backed, stay in memory instead of resolving Dir("") to the current
+	// working directory and littering it with store files.
+	sessionFile := ""
+	if store := e.sessions.StorePath(); store != "" {
+		h := sha256.Sum256([]byte(workspace))
+		sessionFile = filepath.Join(filepath.Dir(store),
+			fmt.Sprintf("%s_ws_%s.json", e.name, hex.EncodeToString(h[:4])))
+	}
 	sessions := NewSessionManager(sessionFile)
 
 	ws.agent = agent
@@ -4992,8 +4997,8 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			}
 			return richMarkdownResolver.ResolveRichCardMarkdown(e.ctx, markdown, final)
 		}
-		buildResolvedRichCard := func(status CardStatus, title string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string {
-			return richCardSupporter.BuildRichCard(status, title, steps, resolveRichCardMarkdown(markdown, !streaming), streaming, statusFooter)
+		buildResolvedRichCard := func(status CardStatus, steps []ToolStep, markdown string, streaming bool, statusFooter string) string {
+			return richCardSupporter.BuildRichCard(status, string(e.i18n.CurrentLang()), steps, resolveRichCardMarkdown(markdown, !streaming), streaming, statusFooter)
 		}
 
 		switch event.Type {
@@ -5015,7 +5020,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					})
 				}
 				if cardMessageID == nil {
-					card := buildResolvedRichCard(CardStatusThinking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+					card := buildResolvedRichCard(CardStatusThinking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 					if starter, ok := p.(PreviewStarter); ok {
 						handle, err := starter.SendPreviewStart(e.ctx, replyCtx, card)
 						if err != nil {
@@ -5025,7 +5030,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 						}
 					}
 				} else if updater, ok := p.(MessageUpdater); ok {
-					card := buildResolvedRichCard(CardStatusThinking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+					card := buildResolvedRichCard(CardStatusThinking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 					if err := updater.UpdateMessage(e.ctx, cardMessageID, card); err != nil {
 						slog.Debug("rich card: failed to update thinking card", "platform", p.Name(), "error", err)
 					}
@@ -5102,7 +5107,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					Summary: truncateIf(event.ToolInput, e.display.ToolMaxLen),
 				})
 				if cardMessageID == nil {
-					card := buildResolvedRichCard(CardStatusWorking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+					card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 					if starter, ok := p.(PreviewStarter); ok {
 						handle, err := starter.SendPreviewStart(e.ctx, replyCtx, card)
 						if err != nil {
@@ -5112,7 +5117,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 						}
 					}
 				} else if updater, ok := p.(MessageUpdater); ok {
-					card := buildResolvedRichCard(CardStatusWorking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+					card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 					if err := updater.UpdateMessage(e.ctx, cardMessageID, card); err != nil {
 						slog.Debug("rich card: failed to update tool card", "platform", p.Name(), "error", err)
 					}
@@ -5232,7 +5237,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					if hasRichCard {
 						toolSteps = mergeRichToolResult(toolSteps, event, result, e.display.ToolMaxLen)
 						if cardMessageID == nil {
-							card := buildResolvedRichCard(CardStatusWorking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+							card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 							if starter, ok := p.(PreviewStarter); ok {
 								handle, err := starter.SendPreviewStart(e.ctx, replyCtx, card)
 								if err != nil {
@@ -5242,7 +5247,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 								}
 							}
 						} else if updater, ok := p.(MessageUpdater); ok {
-							card := buildResolvedRichCard(CardStatusWorking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+							card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 							if err := updater.UpdateMessage(e.ctx, cardMessageID, card); err != nil {
 								slog.Debug("rich card: failed to update tool-result card", "platform", p.Name(), "error", err)
 							}
@@ -5301,7 +5306,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					if len(textParts) == 0 {
 						if hasRichCard {
 							if cardMessageID == nil && !silentHold {
-								card := buildResolvedRichCard(CardStatusWorking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+								card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 								if starter, ok := p.(PreviewStarter); ok {
 									handle, err := starter.SendPreviewStart(e.ctx, replyCtx, card)
 									if err != nil {
@@ -5325,7 +5330,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 							// here using the accumulated partialText so the card emerges
 							// with the post-prefix content already in body.
 							if cardMessageID == nil {
-								card := buildResolvedRichCard(CardStatusWorking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+								card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 								if starter, ok := p.(PreviewStarter); ok {
 									handle, err := starter.SendPreviewStart(e.ctx, replyCtx, card)
 									if err != nil {
@@ -5360,7 +5365,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 									}
 								}
 								if !streamed {
-									card := buildResolvedRichCard(CardStatusWorking, "", toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+									card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 									if updater, ok := p.(MessageUpdater); ok {
 										if err := updater.UpdateMessage(e.ctx, cardMessageID, card); err == nil {
 											lastRichCardUpdate = time.Now()
@@ -5729,7 +5734,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 						silentBody = strings.TrimRight(stripped, " \t\r\n")
 					}
 					if silentBody != "" || len(toolSteps) > 0 {
-						card := buildResolvedRichCard(CardStatusDone, "", toolSteps, silentBody, false, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
+						card := buildResolvedRichCard(CardStatusDone, toolSteps, silentBody, false, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
 						if updater, ok := p.(MessageUpdater); ok {
 							if err := updater.UpdateMessage(e.ctx, cardMessageID, card); err != nil {
 								slog.Debug("rich card: failed to finalize card on silent reply", "platform", p.Name(), "error", err)
@@ -5755,7 +5760,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					richStatusFooter = formatElapsed(time.Since(turnStart), false, e.i18n.currentLang()) + "\n" + legacyStatusFooter
 				}
 				finalBody := resolveRichCardMarkdown(parts[0], true)
-				finalCard := richCardSupporter.BuildRichCard(CardStatusDone, "", toolSteps, finalBody, false, richStatusFooter)
+				finalCard := richCardSupporter.BuildRichCard(CardStatusDone, string(e.i18n.CurrentLang()), toolSteps, finalBody, false, richStatusFooter)
 				if cardMessageID != nil {
 					// Forced final flush via cardkit-v1 streaming text update before
 					// flipping status to Done via full-card Patch. The throttle in the
@@ -5785,7 +5790,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				}
 				for _, overflow := range parts[1:] {
 					overflowBody := resolveRichCardMarkdown(overflow, true)
-					overflowCard := richCardSupporter.BuildRichCard(CardStatusDone, "", nil, overflowBody, false, richStatusFooter)
+					overflowCard := richCardSupporter.BuildRichCard(CardStatusDone, string(e.i18n.CurrentLang()), nil, overflowBody, false, richStatusFooter)
 					if err := p.Send(e.ctx, replyCtx, overflowCard); err != nil {
 						slog.Error("failed to send overflow rich card", "error", err)
 						return
@@ -6036,7 +6041,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			state.eventsNeedResync = true
 			state.mu.Unlock()
 			if hasRichCard && cardMessageID != nil {
-				errCard := buildResolvedRichCard(CardStatusError, "", toolSteps, partialText, false, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
+				errCard := buildResolvedRichCard(CardStatusError, toolSteps, partialText, false, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
 				if updater, ok := p.(MessageUpdater); ok {
 					if err := updater.UpdateMessage(e.ctx, cardMessageID, errCard); err != nil {
 						slog.Debug("rich card: failed to update error card", "platform", p.Name(), "error", err)
@@ -7189,93 +7194,60 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 	if streaming {
 		return ""
 	}
-	var lines []string
+	lang := e.i18n.CurrentLang()
 
-	// Line 1: elapsed timer (now always the "done" form since streaming branch returned above)
-	lines = append(lines, formatElapsed(time.Since(turnStart), streaming, e.i18n.currentLang()))
+	// One glanceable line: elapsed · model · effort · ctx% · workdir.
+	//
+	// The per-tier token breakdown (out/in/cache-write/cache-read) used to sit on
+	// a second line and was dropped: with prompt caching on, InputTokens is only
+	// the non-cached delta, so it read "新增输入 2" on every single turn and
+	// invited misreading as the total. The ctx% below carries the one thing that
+	// number was meant to convey. The legacy footer still reports the full
+	// breakdown via buildClaudeStatusLineFooter for anyone who wants it.
+	head := []string{formatElapsed(time.Since(turnStart), streaming, lang)}
 
-	// Line 2: model + effort + token usage detail + ctx %
 	if e.showContextIndicator {
 		usage := replyFooterSessionContextUsage(session)
 		model := replyFooterModel(session, agent)
 		effort := replyFooterReasoningEffort(session, agent)
-		if line := buildClaudeStatusLineFooter(model, effort, usage); line != "" {
-			lines = append(lines, line)
-		} else if fallback := e.replyFooterUsageText(session, agent); fallback != "" {
-			// fallback for non-claudecode agents that still expose UsageReporter
-			parts := []string{}
-			if model != "" {
-				parts = append(parts, model)
-			}
-			if effort != "" {
-				parts = append(parts, effort)
-			}
-			parts = append(parts, fallback)
-			lines = append(lines, strings.Join(parts, " · "))
+		if model != "" {
+			head = append(head, model)
+		}
+		if effort != "" {
+			head = append(head, effort)
+		}
+		if ctx := richFooterContext(usage, lang); ctx != "" {
+			head = append(head, ctx)
 		}
 	}
 
-	// Line 3: workdir
 	if e.showWorkdirIndicator {
 		if dir := replyFooterWorkDir(session, agent, workspaceDir); dir != "" {
-			lines = append(lines, dir)
+			head = append(head, dir)
 		}
 	}
 
-	return strings.Join(lines, "\n")
+	return strings.Join(head, " · ")
 }
 
-// buildClaudeStatusLineFooter renders the rich-card line-2 token-usage detail:
-//
-//	claude-opus-4-7[1m] · xhigh · out 168 · in 1 cw 971 cr 40.8k · ctx 4%
-//
-// Sections (each skipped when its data is missing):
-//   - model: from session GetModel() / agent.Name()
-//   - effort: reasoning_effort (Codex / Claude high/medium/low/xhigh)
-//   - token counts: out (output) · in (new input) · cw (cache create) · cr (cache read)
-//   - ctx %: UsedTokens / ContextWindow, capped at 100%
-//
-// Returns "" when usage is nil and no model is known.
-func buildClaudeStatusLineFooter(model, effort string, usage *ContextUsage) string {
-	var parts []string
-	if model != "" {
-		parts = append(parts, model)
+// richFooterContext renders the localized context-window percentage, e.g.
+// "ctx 33%" / "上下文 33%". Returns "" when the window size is unknown.
+func richFooterContext(usage *ContextUsage, lang Language) string {
+	if usage == nil || usage.ContextWindow <= 0 {
+		return ""
 	}
-	if effort != "" {
-		parts = append(parts, effort)
+	used := usage.UsedTokens
+	if used <= 0 && usage.TotalTokens > 0 {
+		used = usage.TotalTokens
 	}
-	if usage != nil {
-		var counts []string
-		if usage.OutputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("out %s", formatStatusTokenCount(usage.OutputTokens)))
-		}
-		if usage.InputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("in %s", formatStatusTokenCount(usage.InputTokens)))
-		}
-		if usage.CacheCreationInputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("cw %s", formatStatusTokenCount(usage.CacheCreationInputTokens)))
-		}
-		if usage.CachedInputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("cr %s", formatStatusTokenCount(usage.CachedInputTokens)))
-		}
-		if len(counts) > 0 {
-			parts = append(parts, strings.Join(counts, " "))
-		}
-		if usage.ContextWindow > 0 {
-			used := usage.UsedTokens
-			if used <= 0 && usage.TotalTokens > 0 {
-				used = usage.TotalTokens
-			}
-			if used > 0 {
-				pct := used * 100 / usage.ContextWindow
-				if pct > 100 {
-					pct = 100
-				}
-				parts = append(parts, fmt.Sprintf("ctx %d%%", pct))
-			}
-		}
+	if used <= 0 {
+		return ""
 	}
-	return strings.Join(parts, " · ")
+	pct := used * 100 / usage.ContextWindow
+	if pct > 100 {
+		pct = 100
+	}
+	return fmt.Sprintf("%s %d%%", Translate(MsgFooterContext, lang), pct)
 }
 
 // formatStatusTokenCount renders an integer token count compactly.
