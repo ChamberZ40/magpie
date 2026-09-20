@@ -963,7 +963,7 @@ type richPreviewPlatform struct {
 	previewLifecyclePlatform
 }
 
-func (p *richPreviewPlatform) BuildRichCard(status core.CardStatus, title string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
+func (p *richPreviewPlatform) BuildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
 	var b strings.Builder
 	b.WriteString("status=")
 	b.WriteString(string(status))

@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -175,6 +176,13 @@ type Platform struct {
 	richCardImagePending    map[string]*richCardImageUpload
 	richCardImageFailed     map[string]struct{}
 	richCardImageUploadFunc func(context.Context, string) (string, error)
+
+	// richCardLang remembers the language tag from the most recent
+	// BuildRichCard call so SetPreviewStatus can localize the header it
+	// patches. SetPreviewStatus is invoked by the streaming machinery
+	// (core/streaming.go setStatus/finish) and receives only a handle and a
+	// status, so it has no other way to reach the current language.
+	richCardLang atomic.Value // string
 
 	// imageBatch coalesces consecutive image messages from the same session
 	// arriving within imageBatchWindow. Without this, sending N images in rapid
@@ -4331,38 +4339,6 @@ func splitProgressItemsByLane(items []core.ProgressCardEntry) (reasoning []core.
 	return reasoning, tools, others
 }
 
-func progressPanelTitle(label string, count int, lang string) string {
-	if isZhLikeProgressLang(lang) {
-		switch label {
-		case "Reasoning":
-			label = "思考"
-		case "Tools":
-			label = "工具"
-		case "Updates":
-			label = "更新"
-		}
-	}
-	if count > 0 {
-		return fmt.Sprintf("%s (%d)", label, count)
-	}
-	return label
-}
-
-func buildProgressPanel(title string, expanded bool, elements []map[string]any) map[string]any {
-	return map[string]any{
-		"tag":              "collapsible_panel",
-		"expanded":         expanded,
-		"background_color": "grey",
-		"header": map[string]any{
-			"title": map[string]any{"tag": "plain_text", "content": title},
-		},
-		"border":           map[string]any{"color": "grey"},
-		"vertical_spacing": "8px",
-		"padding":          "4px 8px",
-		"elements":         elements,
-	}
-}
-
 func buildProgressPanelElements(items []core.ProgressCardEntry, lang string) []map[string]any {
 	elements := make([]map[string]any, 0, len(items))
 	for _, item := range items {
@@ -4374,22 +4350,22 @@ func buildProgressPanelElements(items []core.ProgressCardEntry, lang string) []m
 func appendProgressGroupedElements(elements []map[string]any, items []core.ProgressCardEntry, lang string, running bool) []map[string]any {
 	reasoning, tools, others := splitProgressItemsByLane(items)
 	if len(reasoning) > 0 {
-		elements = append(elements, buildProgressPanel(
-			progressPanelTitle("Reasoning", len(reasoning), lang),
+		elements = append(elements, buildCollapsiblePanel(
+			richPanelLabel(core.MsgRichPanelReasoning, len(reasoning), lang),
 			running,
 			buildProgressPanelElements(reasoning, lang),
 		))
 	}
 	if len(tools) > 0 {
-		elements = append(elements, buildProgressPanel(
-			progressPanelTitle("Tools", len(tools), lang),
+		elements = append(elements, buildCollapsiblePanel(
+			richPanelLabel(core.MsgRichPanelTools, len(tools), lang),
 			running,
 			buildProgressPanelElements(tools, lang),
 		))
 	}
 	if len(others) > 0 {
-		elements = append(elements, buildProgressPanel(
-			progressPanelTitle("Updates", len(others), lang),
+		elements = append(elements, buildCollapsiblePanel(
+			richPanelLabel(core.MsgRichPanelUpdates, len(others), lang),
 			running,
 			buildProgressPanelElements(others, lang),
 		))
@@ -5780,26 +5756,6 @@ func isSkillPathValue(value string) bool {
 	return strings.Contains(strings.ToLower(value), "/skills/")
 }
 
-var thinkingVerbs = []string{
-	"Churning", "Clauding", "Coalescing", "Cogitating", "Computing",
-	"Combobulating", "Concocting", "Conjuring", "Considering", "Contemplating",
-	"Cooking", "Crafting", "Creating", "Crunching", "Deciphering",
-	"Deliberating", "Divining", "Effecting", "Elucidating", "Enchanting",
-	"Envisioning", "Finagling", "Forging", "Generating", "Germinating",
-	"Hatching", "Ideating", "Imagining", "Incubating", "Inferring",
-	"Manifesting", "Marinating", "Meandering", "Mulling", "Musing",
-	"Noodling", "Percolating", "Perusing", "Pondering", "Processing",
-	"Puzzling", "Reticulating", "Ruminating", "Scheming", "Simmering",
-	"Spelunking", "Spinning", "Stewing", "Sussing", "Synthesizing",
-	"Thinking", "Tinkering", "Transmuting", "Unfurling", "Unravelling",
-	"Vibing", "Wandering", "Whirring", "Wizarding", "Working", "Wrangling",
-}
-
-func pickThinkingVerb() string {
-	idx := time.Now().Unix() % int64(len(thinkingVerbs))
-	return thinkingVerbs[idx] + "..."
-}
-
 var markdownTablePattern = regexp.MustCompile(`(?m)^\|.+\|\s*\n\|[\s:|-]+\|\s*\n(?:\|.+\|\s*\n?)+`)
 
 type markdownTextMatch struct {
@@ -6356,16 +6312,19 @@ func isCardJSON(content string) bool {
 
 // buildCardJSONWithStatus builds a Feishu card JSON with a colored header
 // reflecting the given status. Used as a fallback when rich-card assembly fails.
-func buildCardJSONWithStatus(content string, status core.CardStatus) string {
+// buildCardJSONWithStatus renders a simple status-colored card (no panels, no
+// footer). Used as the oversize fallback from buildRichCard and by
+// SetPreviewStatus, which patches the whole card to reflect a status change.
+//
+// The header carries the same glyph + localized status word as the full rich
+// card. It previously hardcoded an empty title, which silently blanked the
+// header every time SetPreviewStatus fired mid-turn.
+func buildCardJSONWithStatus(content string, status core.CardStatus, lang string) string {
 	content = sanitizeCardMarkdownForCard(content)
-	template := "grey"
-	switch status {
-	case core.CardStatusWorking, core.CardStatusThinking:
-		template = "blue"
-	case core.CardStatusDone:
-		template = "green"
-	case core.CardStatusError:
-		template = "red"
+	headerTitle, template := richStatusHeader(status, lang)
+	if status == "" {
+		// No status to show: keep the neutral grey/empty header of old.
+		headerTitle, template = "", "grey"
 	}
 	card := map[string]any{
 		"schema": "2.0",
@@ -6374,7 +6333,7 @@ func buildCardJSONWithStatus(content string, status core.CardStatus) string {
 		},
 		"header": map[string]any{
 			"template": template,
-			"title":    map[string]any{"tag": "plain_text", "content": ""},
+			"title":    map[string]any{"tag": "plain_text", "content": headerTitle},
 		},
 		"body": map[string]any{
 			"elements": []map[string]any{
@@ -6405,6 +6364,39 @@ func richLaneTitle(label string, count int) string {
 		return fmt.Sprintf("%s (%d)", label, count)
 	}
 	return label
+}
+
+// richPanelLabel renders a localized collapsible-panel title, e.g. "🧠 推理 (3)".
+// The glyph goes in the title text rather than the panel header's icon field,
+// because that field is the expand chevron — overwriting it would cost the
+// affordance that lets a reader open a panel after the turn collapses it.
+func richPanelLabel(key core.MsgKey, count int, lang string) string {
+	glyph := ""
+	switch key {
+	case core.MsgRichPanelReasoning:
+		glyph = "🧠 "
+	case core.MsgRichPanelTools:
+		glyph = "🔧 "
+	case core.MsgRichPanelUpdates:
+		glyph = "📋 "
+	}
+	return richLaneTitle(glyph+core.Translate(key, core.Language(lang)), count)
+}
+
+// richStatusHeader maps a card status to its header glyph + localized word and
+// template color. The result depends only on status and lang — never on the
+// clock — so repeated builds within one turn produce a stable header instead of
+// the per-second churn the old random-verb picker caused.
+func richStatusHeader(status core.CardStatus, lang string) (title, template string) {
+	switch status {
+	case core.CardStatusDone:
+		// Done shows no title at all: the green header bar is the signal, and
+		// the finished answer right below it is the content.
+		return "", "green"
+	case core.CardStatusError:
+		return "✖ " + core.Translate(core.MsgRichCardStatusError, core.Language(lang)), "red"
+	}
+	return "● " + core.Translate(core.MsgRichCardStatusWorking, core.Language(lang)), "blue"
 }
 
 func richStepRowContent(step core.ToolStep) string {
@@ -6471,7 +6463,13 @@ func richPanelElements(steps []core.ToolStep, emptyText string) []map[string]any
 	return elements
 }
 
-func buildRichPanel(title string, expanded bool, elements []map[string]any) map[string]any {
+// buildCollapsiblePanel builds a grey collapsible panel. Shared by the rich
+// reply card and the progress/preview card, which had byte-identical builders.
+//
+// header carries no "icon" key on purpose: in a collapsible_panel that field is
+// the expand chevron, so setting it would trade the open/close affordance for a
+// decorative glyph. Semantic icons belong in the title text instead.
+func buildCollapsiblePanel(title string, expanded bool, elements []map[string]any) map[string]any {
 	return map[string]any{
 		"tag":              "collapsible_panel",
 		"expanded":         expanded,
@@ -6491,11 +6489,11 @@ const maxRichCardJSONBytes = 28000
 // buildRichCard renders a Card 2.0 "single-card" turn with collapsible
 // reasoning/tool panels, streaming markdown body, status-colored header, and a
 // pre-composed multi-line statusFooter (engine-owned, includes elapsed).
-func buildRichCard(status core.CardStatus, _ string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
-	b, err := buildRichCardJSONBytes(status, steps, markdown, streaming, statusFooter)
+func buildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
+	b, err := buildRichCardJSONBytes(status, lang, steps, markdown, streaming, statusFooter)
 	if err != nil {
 		slog.Debug("feishu: build rich card marshal failed, fallback to basic card", "error", err)
-		return buildCardJSONWithStatus(markdown, status)
+		return buildCardJSONWithStatus(markdown, status, lang)
 	}
 	if len(b) <= maxRichCardJSONBytes {
 		return string(b)
@@ -6514,7 +6512,7 @@ func buildRichCard(status core.CardStatus, _ string, steps []core.ToolStep, mark
 		{perLane: 3, textLen: 80},
 	} {
 		compactSteps := compactRichStepsForCardSize(steps, limit.perLane, limit.textLen)
-		compact, err := buildRichCardJSONBytes(status, compactSteps, markdown, streaming, statusFooter)
+		compact, err := buildRichCardJSONBytes(status, lang, compactSteps, markdown, streaming, statusFooter)
 		if err == nil && len(compact) <= maxRichCardJSONBytes {
 			slog.Debug("feishu: rich card exceeded size limit, compacted panels",
 				"original_size", len(b),
@@ -6531,28 +6529,32 @@ func buildRichCard(status core.CardStatus, _ string, steps []core.ToolStep, mark
 		fallbackMarkdown = compactRichFallbackMarkdown(steps)
 	}
 	slog.Debug("feishu: rich card exceeds size limit, fallback to compact markdown card", "size", len(b))
-	return buildCardJSONWithStatus(fallbackMarkdown, status)
+	return buildCardJSONWithStatus(fallbackMarkdown, status, lang)
 }
 
-func buildRichCardJSONBytes(status core.CardStatus, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) ([]byte, error) {
+func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) ([]byte, error) {
 	reasoningSteps, toolSteps := splitRichStepsByLane(steps)
 	panelMaps := make([]map[string]any, 0, 2)
 	if len(reasoningSteps) > 0 {
-		panelMaps = append(panelMaps, buildRichPanel(
-			richLaneTitle("Reasoning", len(reasoningSteps)),
+		panelMaps = append(panelMaps, buildCollapsiblePanel(
+			richPanelLabel(core.MsgRichPanelReasoning, len(reasoningSteps), lang),
 			streaming,
 			richPanelElements(reasoningSteps, "Thinking..."),
 		))
 	}
 	if len(toolSteps) > 0 {
-		panelMaps = append(panelMaps, buildRichPanel(
-			richLaneTitle("Tools", len(toolSteps)),
+		panelMaps = append(panelMaps, buildCollapsiblePanel(
+			richPanelLabel(core.MsgRichPanelTools, len(toolSteps), lang),
 			streaming,
 			richPanelElements(toolSteps, "No tool steps"),
 		))
 	}
 	if len(panelMaps) == 0 && streaming {
-		panelMaps = append(panelMaps, buildRichPanel("Reasoning", true, richPanelElements(nil, "Thinking...")))
+		panelMaps = append(panelMaps, buildCollapsiblePanel(
+			richPanelLabel(core.MsgRichPanelReasoning, 0, lang),
+			true,
+			richPanelElements(nil, "Thinking..."),
+		))
 	}
 
 	markdownMap := map[string]any{
@@ -6562,21 +6564,20 @@ func buildRichCardJSONBytes(status core.CardStatus, steps []core.ToolStep, markd
 	}
 
 	// Footer: engine pre-composes a multi-line statusFooter (lines separated by \n).
-	// Each line renders as its own dim "notation"-sized markdown block so they
-	// visually sit below the body without being mistaken for content. Skip
-	// rendering when statusFooter is empty (footer disabled / nothing to show).
-	var footerElements []map[string]any
+	// All lines render as ONE dim "notation"-sized markdown block, so the metadata
+	// reads as a single group rather than as N unrelated footnotes each paying a
+	// vertical_spacing gap. Skip entirely when statusFooter is empty (footer
+	// disabled / nothing to show).
+	footerContent := ""
 	if statusFooter != "" {
+		var lines []string
 		for _, line := range strings.Split(statusFooter, "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
+			if line = strings.TrimSpace(line); line != "" {
+				lines = append(lines, line)
 			}
-			footerElements = append(footerElements, map[string]any{
-				"tag":       "markdown",
-				"content":   sanitizeCardMarkdownForCard(line),
-				"text_size": "notation",
-			})
+		}
+		if len(lines) > 0 {
+			footerContent = sanitizeCardMarkdownForCard(strings.Join(lines, "\n"))
 		}
 	}
 
@@ -6587,26 +6588,18 @@ func buildRichCardJSONBytes(status core.CardStatus, steps []core.ToolStep, markd
 	} else {
 		elements = append(elements, markdownMap)
 	}
-	if len(footerElements) > 0 {
-		// Insert a horizontal separator between body and footer so the boundary is clear.
+	if footerContent != "" {
+		// Horizontal separator makes the body/footer boundary explicit.
 		elements = append(elements, map[string]any{"tag": "hr"})
-		elements = append(elements, footerElements...)
+		elements = append(elements, map[string]any{
+			"tag":       "markdown",
+			"content":   footerContent,
+			"text_size": "notation",
+		})
 	}
 
-	// Header template color follows status.
-	headerTemplate := "blue"
-	headerTitle := pickThinkingVerb()
-	switch status {
-	case core.CardStatusDone:
-		headerTemplate = "green"
-		headerTitle = "Done"
-	case core.CardStatusError:
-		headerTemplate = "red"
-		headerTitle = "Error"
-	case core.CardStatusThinking, core.CardStatusWorking:
-		headerTemplate = "blue"
-		headerTitle = pickThinkingVerb()
-	}
+	// Header glyph, localized word and template color all follow status.
+	headerTitle, headerTemplate := richStatusHeader(status, lang)
 
 	card := map[string]any{
 		"schema": "2.0",
@@ -6715,9 +6708,18 @@ func splitMarkdownByTables(md string, maxTables int) []string {
 
 // BuildRichCard implements core.RichCardSupporter. The engine pre-composes
 // statusFooter (multi-line, '\n'-separated) and passes it through; the renderer
-// splits it back into one dim notation block per line.
-func (p *Platform) BuildRichCard(status core.CardStatus, title string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
-	return buildRichCard(status, title, steps, markdown, streaming, statusFooter)
+// renders it as a single dim notation block. lang localizes the header status
+// word and the collapsible panel titles, and may be empty (falls back to English).
+func (p *Platform) BuildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
+	p.richCardLang.Store(lang)
+	return buildRichCard(status, lang, steps, markdown, streaming, statusFooter)
+}
+
+// currentRichCardLang returns the language tag from the most recent
+// BuildRichCard call, or "" (English fallback) before the first one.
+func (p *Platform) currentRichCardLang() string {
+	lang, _ := p.richCardLang.Load().(string)
+	return lang
 }
 
 // SplitMarkdownByTables implements core.MarkdownTableSplitter.
@@ -6740,7 +6742,7 @@ func (p *Platform) SetPreviewStatus(previewHandle any, status core.CardStatus) {
 	if lastContent == "" {
 		return
 	}
-	cardJSON := buildCardJSONWithStatus(lastContent, status)
+	cardJSON := buildCardJSONWithStatus(lastContent, status, p.currentRichCardLang())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

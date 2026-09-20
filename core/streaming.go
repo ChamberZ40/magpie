@@ -80,14 +80,21 @@ type ToolStep struct {
 // statusFooter is a pre-composed multi-line string assembled by the engine
 // (typically one line per: elapsed time, model · effort · ctx, workdir).
 // Pass empty string to hide the footer entirely. Lines are separated by '\n';
-// the platform implementation is expected to render each line as its own
-// dim-styled element so they don't visually merge with the body markdown.
+// the platform implementation is expected to render them as a dim-styled block
+// set apart from the body markdown.
+//
+// lang is the engine's current UI language tag (e.g. "en", "zh", "ja"). Header
+// status words and collapsible panel titles are chrome the platform assembles
+// itself, so this is the only localization input it gets — unlike statusFooter,
+// which the engine has already localized. May be empty; implementations must
+// fall back to English. The engine reads it per build, so a runtime /lang
+// switch takes effect on the next card without a restart.
 //
 // (Phase B refactor: previously took elapsed time.Duration; now the engine
 // owns elapsed-time formatting so it can apply i18n + project-level toggles
 // uniformly with the rest of the footer.)
 type RichCardSupporter interface {
-	BuildRichCard(status CardStatus, title string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string
+	BuildRichCard(status CardStatus, lang string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string
 }
 
 // RichCardMarkdownResolver is an optional interface for platforms that need to

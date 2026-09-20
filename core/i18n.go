@@ -372,10 +372,23 @@ const (
 	MsgCardTitleSkills           MsgKey = "card_title_skills"
 	MsgCardTitleDoctor           MsgKey = "card_title_doctor"
 	MsgCardTitleVersion          MsgKey = "card_title_version"
-	MsgListItem                  MsgKey = "list_item"
-	MsgListEmptySummary          MsgKey = "list_empty_summary"
-	MsgCronIDLabel               MsgKey = "cron_id_label"
-	MsgCronFailedSuffix          MsgKey = "cron_failed_suffix"
+
+	// Rich-card chrome assembled inside the platform (Feishu Card 2.0 header
+	// status word and collapsible panel titles). Looked up via Translate with
+	// the language tag the engine passes to RichCardSupporter.BuildRichCard.
+	MsgRichCardStatusWorking MsgKey = "rich_card_status_working"
+	MsgRichCardStatusError   MsgKey = "rich_card_status_error"
+	MsgRichPanelReasoning    MsgKey = "rich_panel_reasoning"
+	MsgRichPanelTools        MsgKey = "rich_panel_tools"
+	MsgRichPanelUpdates      MsgKey = "rich_panel_updates"
+
+	// Rich-card footer context label.
+	MsgFooterContext MsgKey = "footer_context"
+
+	MsgListItem         MsgKey = "list_item"
+	MsgListEmptySummary MsgKey = "list_empty_summary"
+	MsgCronIDLabel      MsgKey = "cron_id_label"
+	MsgCronFailedSuffix MsgKey = "cron_failed_suffix"
 
 	MsgTimerNotAvailable   MsgKey = "timer_not_available"
 	MsgTimerUsage          MsgKey = "timer_usage"
@@ -2528,6 +2541,32 @@ var messages = map[MsgKey]map[Language]string{
 		LangEnglish: "Reasoning", LangChinese: "推理强度", LangTraditionalChinese: "推理強度",
 		LangJapanese: "推論強度", LangSpanish: "Razonamiento",
 	},
+	// Rich-card header status words. Thinking and Working share one key: both
+	// render the same word and the same blue template.
+	MsgRichCardStatusWorking: {
+		LangEnglish: "Thinking…", LangChinese: "思考中…", LangTraditionalChinese: "思考中…",
+		LangJapanese: "考え中…", LangSpanish: "Pensando…",
+	},
+	MsgRichCardStatusError: {
+		LangEnglish: "Error", LangChinese: "出错", LangTraditionalChinese: "出錯",
+		LangJapanese: "エラー", LangSpanish: "Error",
+	},
+	MsgFooterContext: {
+		LangEnglish: "ctx", LangChinese: "上下文", LangTraditionalChinese: "上下文",
+		LangJapanese: "コンテキスト", LangSpanish: "contexto",
+	},
+	MsgRichPanelReasoning: {
+		LangEnglish: "Reasoning", LangChinese: "推理", LangTraditionalChinese: "推理",
+		LangJapanese: "推論", LangSpanish: "Razonamiento",
+	},
+	MsgRichPanelTools: {
+		LangEnglish: "Tools", LangChinese: "工具", LangTraditionalChinese: "工具",
+		LangJapanese: "ツール", LangSpanish: "Herramientas",
+	},
+	MsgRichPanelUpdates: {
+		LangEnglish: "Updates", LangChinese: "更新", LangTraditionalChinese: "更新",
+		LangJapanese: "更新", LangSpanish: "Actualizaciones",
+	},
 	MsgCardTitleMode: {
 		LangEnglish: "Permission Mode", LangChinese: "权限模式", LangTraditionalChinese: "權限模式",
 		LangJapanese: "権限モード", LangSpanish: "Modo de permisos",
@@ -4097,10 +4136,11 @@ var messages = map[MsgKey]map[Language]string{
 	},
 }
 
-func (i *I18n) T(key MsgKey) string {
-	i.mu.RLock()
-	lang := i.currentLang()
-	i.mu.RUnlock()
+// Translate looks up key in the given language, independent of any I18n
+// instance. Platforms that assemble their own chrome (Feishu card headers and
+// collapsible panel titles) receive a language tag rather than an *I18n, so they
+// need a stateless lookup. Falls back zh-TW → zh → en, then to the key itself.
+func Translate(key MsgKey, lang Language) string {
 	if msg, ok := messages[key]; ok {
 		if translated, ok := msg[lang]; ok {
 			return translated
@@ -4116,6 +4156,13 @@ func (i *I18n) T(key MsgKey) string {
 		}
 	}
 	return string(key)
+}
+
+func (i *I18n) T(key MsgKey) string {
+	i.mu.RLock()
+	lang := i.currentLang()
+	i.mu.RUnlock()
+	return Translate(key, lang)
 }
 
 func (i *I18n) Tf(key MsgKey, args ...interface{}) string {

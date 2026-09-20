@@ -382,9 +382,9 @@ func (p *stubCompactProgressPlatform) UpdateMessage(_ context.Context, _ any, co
 	return nil
 }
 
-func (p *stubCompactProgressPlatform) BuildRichCard(status CardStatus, title string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string {
+func (p *stubCompactProgressPlatform) BuildRichCard(status CardStatus, lang string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "rich status=%s title=%s streaming=%t footer=%s\n", status, title, streaming, statusFooter)
+	fmt.Fprintf(&b, "rich status=%s lang=%s streaming=%t footer=%s\n", status, lang, streaming, statusFooter)
 	for _, step := range steps {
 		fmt.Fprintf(&b, "step=%+v\n", step)
 	}
@@ -436,7 +436,7 @@ type stubAskQuestionRichCardPlatform struct {
 	stubCardPlatform
 }
 
-func (p *stubAskQuestionRichCardPlatform) BuildRichCard(status CardStatus, title string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string {
+func (p *stubAskQuestionRichCardPlatform) BuildRichCard(status CardStatus, lang string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string {
 	return "rich card"
 }
 
@@ -2072,7 +2072,7 @@ type stubRichCardSilentPlatform struct {
 	nextHandleSeq int
 }
 
-func (p *stubRichCardSilentPlatform) BuildRichCard(status CardStatus, _ string, steps []ToolStep, markdown string, _ bool, _ string) string {
+func (p *stubRichCardSilentPlatform) BuildRichCard(status CardStatus, lang string, steps []ToolStep, markdown string, _ bool, _ string) string {
 	return fmt.Sprintf("rich:status=%s steps=%d body=%q", status, len(steps), markdown)
 }
 

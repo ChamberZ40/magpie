@@ -1061,11 +1061,11 @@ func TestBuildPreviewCardJSON_ProgressPayloadSeparatesReasoningAndTools(t *testi
 	if len(panels) != 2 {
 		t.Fatalf("panel count = %d, want 2 panels: %#v", len(panels), panels)
 	}
-	if got := cardPanelTitle(panels[0]); got != "Reasoning (1)" {
-		t.Fatalf("first panel title = %q, want Reasoning (1)", got)
+	if got := cardPanelTitle(panels[0]); got != "🧠 Reasoning (1)" {
+		t.Fatalf("first panel title = %q, want 🧠 Reasoning (1)", got)
 	}
-	if got := cardPanelTitle(panels[1]); got != "Tools (2)" {
-		t.Fatalf("second panel title = %q, want Tools (2)", got)
+	if got := cardPanelTitle(panels[1]); got != "🔧 Tools (2)" {
+		t.Fatalf("second panel title = %q, want 🔧 Tools (2)", got)
 	}
 	if panelContains(t, panels[0], "pwd") {
 		t.Fatalf("reasoning panel should not include tool content: %#v", panels[0])
@@ -1270,11 +1270,11 @@ func TestBuildRichCard_SeparatesReasoningAndTools(t *testing.T) {
 	if len(panels) != 2 {
 		t.Fatalf("panel count = %d, want 2 panels: %#v", len(panels), panels)
 	}
-	if got := cardPanelTitle(panels[0]); got != "Reasoning (1)" {
-		t.Fatalf("first panel title = %q, want Reasoning (1)", got)
+	if got := cardPanelTitle(panels[0]); got != "🧠 Reasoning (1)" {
+		t.Fatalf("first panel title = %q, want 🧠 Reasoning (1)", got)
 	}
-	if got := cardPanelTitle(panels[1]); got != "Tools (1)" {
-		t.Fatalf("second panel title = %q, want Tools (1)", got)
+	if got := cardPanelTitle(panels[1]); got != "🔧 Tools (1)" {
+		t.Fatalf("second panel title = %q, want 🔧 Tools (1)", got)
 	}
 	if panelContains(t, panels[0], "pwd") {
 		t.Fatalf("reasoning panel should not include tool content: %#v", panels[0])

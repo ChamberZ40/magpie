@@ -230,6 +230,12 @@ func newCUJEnv(t *testing.T) *cujEnv {
 	agent := &cujAgent{}
 	storePath := dir + "/sessions.json"
 	e := NewEngine("test", agent, []Platform{plat}, storePath, LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 	return &cujEnv{
 		t:       t,
 		engine:  e,
@@ -639,6 +645,12 @@ func TestCUJ_G1_LLMFailureSurfacesErrorToUser(t *testing.T) {
 	agent.failNext.Set(true)
 	dir := t.TempDir()
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 
 	msg := &Message{
 		SessionKey: "test:fred",
@@ -1024,6 +1036,12 @@ func TestCUJ_G3_PlatformReconnectReinitializesAndDelivers(t *testing.T) {
 	}
 	agent := &cujAgent{}
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 
 	// 1. Initial connect.
 	e.OnPlatformReady(plat)
@@ -1127,6 +1145,12 @@ func TestCUJ_A3_ImageReachesAgent(t *testing.T) {
 	agent := &cujAgent{}
 	dir := t.TempDir()
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 
 	msg := &Message{
 		SessionKey: "test:img", Platform: "test", MessageID: "img1",
@@ -1162,6 +1186,12 @@ func TestCUJ_A4_VoiceMessageWithoutSTTSurfacesClearMessage(t *testing.T) {
 	agent := &cujAgent{}
 	dir := t.TempDir()
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 
 	msg := &Message{
 		SessionKey: "test:voice", Platform: "test", MessageID: "v1",
@@ -1191,6 +1221,12 @@ func TestCUJ_A5_FileReachesAgent(t *testing.T) {
 	agent := &cujAgent{}
 	dir := t.TempDir()
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 
 	msg := &Message{
 		SessionKey: "test:file", Platform: "test", MessageID: "f1",
@@ -1607,6 +1643,12 @@ func TestCUJ_E4_TimerFiresAndDeliversToAgentAndUser(t *testing.T) {
 	plat := &cujReplyCtxPlatform{stubPlatformEngine: &stubPlatformEngine{n: "test"}}
 	agent := &cujAgent{}
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 
 	timerDir := dir + "/timer"
 	if err := os.MkdirAll(timerDir, 0o755); err != nil {
@@ -1965,6 +2007,12 @@ func TestCUJ_H2_TwoPlatformsConcurrentNoBleed(t *testing.T) {
 	pB := &stubPlatformEngine{n: "platB"}
 	agent := &cujAgent{}
 	e := NewEngine("test", agent, []Platform{pA, pB}, dir+"/sessions.json", LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 
 	// Fire 5 messages on each platform concurrently.
 	var wg sync.WaitGroup
@@ -2115,6 +2163,12 @@ func newCUJStreamingEnv(t *testing.T) *cujEnv {
 	agent := &cujAgent{}
 	storePath := dir + "/sessions.json"
 	e := NewEngine("test", agent, []Platform{plat}, storePath, LangEnglish)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(e) })
 	// env.plat is typed *stubPlatformEngine so that userSends (which
 	// calls plat(env.plat) to bridge into a Platform interface) works.
 	// We point it at the same embedded instance the engine holds, so
@@ -2353,6 +2407,12 @@ func TestCUJ_H4_FeishuTopicsKeepWorkspaceBindingsIsolated(t *testing.T) {
 		filepath.Join(t.TempDir(), "sessions.json"),
 		LangEnglish,
 	)
+	// Stop the engine before t.TempDir() cleanup: session persistence writes
+	// sessions.json from the message goroutine, and a write landing during
+	// RemoveAll fails cleanup with "directory not empty". t.Cleanup (not defer)
+	// because this also runs inside the newCUJEnv factory, and LIFO ordering
+	// puts this before the TempDir cleanup registered above.
+	t.Cleanup(func() { stopAndSettle(engine) })
 	engine.SetMultiWorkspace(baseDir, filepath.Join(t.TempDir(), "bindings.json"))
 	engine.workspaceBindings.Bind(
 		"project:test",
@@ -2411,4 +2471,43 @@ func TestCUJ_H4_FeishuTopicsKeepWorkspaceBindingsIsolated(t *testing.T) {
 	if got := lastReply(); !strings.Contains(got, normalizeWorkspacePath(workspaceB)) {
 		t.Fatalf("topic B changed after topic A unbind: %q", got)
 	}
+}
+
+// stopAndSettle stops the engine and waits for its session-persistence writes
+// to drain before the caller's t.TempDir() cleanup deletes the directory.
+//
+// Engine.Stop cancels the context but does not join the goroutines started by
+// ReceiveMessage, and those goroutines call SessionManager.Save ->
+// AtomicWriteFile, which creates a ".tmp-*" file next to sessions.json. A write
+// landing while TempDir's RemoveAll is running fails the test with
+// "directory not empty" — with no assertion failure, which makes it look
+// mysterious. Several CUJ tests return as soon as they observe the behavior
+// under test, mid-turn, which is exactly when this is most likely.
+//
+// ponytail: polls for quiescence instead of joining the goroutines. The real
+// fix is a WaitGroup in Engine so Stop() joins its workers — that would also
+// make production shutdown flush sessions.json instead of racing exit. Do that
+// if this proves flaky again or if shutdown durability starts to matter.
+func stopAndSettle(e *Engine) {
+	_ = e.Stop()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if !hasPendingAtomicWrite(e.sessions.storePath) {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func hasPendingAtomicWrite(storePath string) bool {
+	entries, err := os.ReadDir(filepath.Dir(storePath))
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".tmp-") {
+			return true
+		}
+	}
+	return false
 }
