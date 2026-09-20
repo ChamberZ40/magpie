@@ -588,6 +588,17 @@ const (
 	MsgBuiltinCmdDir       MsgKey = "dir"
 	MsgBuiltinCmdDiff      MsgKey = "diff"
 	MsgBuiltinCmdPs        MsgKey = "ps"
+	// These seven shipped without descriptions for a while: GetAllCommands
+	// resolves a description by using the command name as the MsgKey, so a
+	// missing entry degrades to the bare name ("/tts tts") instead of failing
+	// the build. TestBuiltinCommands_HaveLocalizedDescriptions now guards it.
+	MsgBuiltinCmdTTS       MsgKey = "tts"
+	MsgBuiltinCmdTimer     MsgKey = "timer"
+	MsgBuiltinCmdHeartbeat MsgKey = "heartbeat"
+	MsgBuiltinCmdCancel    MsgKey = "cancel"
+	MsgBuiltinCmdWorkspace MsgKey = "workspace"
+	MsgBuiltinCmdWhoami    MsgKey = "whoami"
+	MsgBuiltinCmdWeb       MsgKey = "web"
 
 	MsgDiffEmpty       MsgKey = "diff_empty"
 	MsgDiffNoDiff2HTML MsgKey = "diff_no_diff2html"
@@ -3733,6 +3744,55 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "向正在執行的任務追加補充資訊",
 		LangJapanese:           "実行中のタスクに補足情報を送信",
 		LangSpanish:            "Enviar un P.S. a la tarea en curso",
+	},
+	MsgBuiltinCmdTTS: {
+		LangEnglish:            "Voice reply on/off, arg: [always|voice_only]",
+		LangChinese:            "开关语音回复，参数: [always|voice_only]",
+		LangTraditionalChinese: "開關語音回覆，參數: [always|voice_only]",
+		LangJapanese:           "音声返信の切替、引数: [always|voice_only]",
+		LangSpanish:            "Activar/desactivar respuesta por voz, arg: [always|voice_only]",
+	},
+	MsgBuiltinCmdTimer: {
+		LangEnglish:            "One-off scheduled tasks, arg: [add|addexec|list|del|mute|unmute]",
+		LangChinese:            "管理一次性定时任务，参数: [add|addexec|list|del|mute|unmute]",
+		LangTraditionalChinese: "管理一次性定時任務，參數: [add|addexec|list|del|mute|unmute]",
+		LangJapanese:           "単発タイマーの管理、引数: [add|addexec|list|del|mute|unmute]",
+		LangSpanish:            "Tareas programadas únicas, arg: [add|addexec|list|del|mute|unmute]",
+	},
+	MsgBuiltinCmdHeartbeat: {
+		LangEnglish:            "View/control the heartbeat job, arg: [status|pause|resume|run|interval]",
+		LangChinese:            "查看/控制心跳任务，参数: [status|pause|resume|run|interval]",
+		LangTraditionalChinese: "查看/控制心跳任務，參數: [status|pause|resume|run|interval]",
+		LangJapanese:           "ハートビートの表示/制御、引数: [status|pause|resume|run|interval]",
+		LangSpanish:            "Ver/controlar el latido, arg: [status|pause|resume|run|interval]",
+	},
+	MsgBuiltinCmdCancel: {
+		LangEnglish:            "Stop execution and start a fresh session",
+		LangChinese:            "停止执行并开启新会话",
+		LangTraditionalChinese: "停止執行並開啟新會話",
+		LangJapanese:           "実行を停止して新しいセッションを開始",
+		LangSpanish:            "Detener la ejecución e iniciar una sesión nueva",
+	},
+	MsgBuiltinCmdWorkspace: {
+		LangEnglish:            "Manage workspace bindings, arg: [init|bind|route|unbind|list|shared]",
+		LangChinese:            "管理工作区绑定，参数: [init|bind|route|unbind|list|shared]",
+		LangTraditionalChinese: "管理工作區綁定，參數: [init|bind|route|unbind|list|shared]",
+		LangJapanese:           "ワークスペース紐付けの管理、引数: [init|bind|route|unbind|list|shared]",
+		LangSpanish:            "Gestionar vinculaciones de workspace, arg: [init|bind|route|unbind|list|shared]",
+	},
+	MsgBuiltinCmdWhoami: {
+		LangEnglish:            "Show your user ID and current session",
+		LangChinese:            "查看自己的用户 ID 和当前会话",
+		LangTraditionalChinese: "查看自己的使用者 ID 和目前會話",
+		LangJapanese:           "自分のユーザー ID と現在のセッションを表示",
+		LangSpanish:            "Ver tu ID de usuario y la sesión actual",
+	},
+	MsgBuiltinCmdWeb: {
+		LangEnglish:            "View/set up the web console, arg: [status|setup]",
+		LangChinese:            "查看/配置 Web 控制台，参数: [status|setup]",
+		LangTraditionalChinese: "查看/設定 Web 控制台，參數: [status|setup]",
+		LangJapanese:           "Web コンソールの表示/設定、引数: [status|setup]",
+		LangSpanish:            "Ver/configurar la consola web, arg: [status|setup]",
 	},
 	MsgDiffEmpty: {
 		LangEnglish:            "No diff — clean working tree (or no changes vs `%s`).",
