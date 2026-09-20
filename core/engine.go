@@ -7238,7 +7238,11 @@ const (
 	// that stays out of the way; at or above it it gains a red dot and the
 	// remaining token budget, because that is the point where the user has to
 	// act (/compact) rather than merely be informed.
-	richFooterCtxAlertPct = 85
+	//
+	// Deliberately late. An alert that fires with a fifth of the window still
+	// free trains the user to ignore it, and the bar already conveys "getting
+	// full" on its own — the red dot is reserved for "act now".
+	richFooterCtxAlertPct = 95
 )
 
 // contextBudget converts a ContextUsage into the used/remaining token figures a
@@ -7304,7 +7308,7 @@ func richFooterCtxBar(pct int) string {
 // dot — the only colored glyph in an otherwise dim footer — and the remaining
 // token budget, which is the number the user actually acts on:
 //
-//	🔴 上下文 ━━━━━━━━━─ 91% 剩 18k
+//	🔴 上下文 ━━━━━━━━━━ 97% 剩 6.0k
 //
 // Returns "" when the window size or usage is unknown.
 func richFooterContext(usage *ContextUsage, lang Language) string {

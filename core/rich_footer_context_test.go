@@ -55,9 +55,10 @@ func TestRichFooterContext_EscalatesOnlyAtAlertThreshold(t *testing.T) {
 	}{
 		{"well below", 58_700, false},
 		{"mid", 136_000, false},
+		{"climbing but not critical", 182_000, false},
 		{"one below threshold", (richFooterCtxAlertPct - 1) * window / 100, false},
 		{"exactly at threshold", richFooterCtxAlertPct * window / 100, true},
-		{"nearly full", 182_000, true},
+		{"nearly full", 192_000, true},
 		{"full", window, true},
 	}
 	for _, tt := range tests {
@@ -77,21 +78,36 @@ func TestRichFooterContext_EscalatesOnlyAtAlertThreshold(t *testing.T) {
 	}
 }
 
-// The alerting number is the one the user acts on, so it must agree with the
-// percentage shown beside it rather than being computed off a different base.
-func TestRichFooterContext_RemainingExcludesBaseline(t *testing.T) {
-	usage := &ContextUsage{
+// The baseline is fixed system overhead the user cannot reclaim, so it is
+// subtracted from both the used total and the window. That cancels out of
+// `remaining` — only the percentage moves, and with it the alert boundary.
+func TestRichFooterContext_ExcludesBaselineFromPercent(t *testing.T) {
+	// 190k of a 200k window is 95% raw, which would alert. Excluding the 20k
+	// baseline it is 170k of 180k = 94%, which must not.
+	got := richFooterContext(&ContextUsage{
 		UsedTokens:     190_000,
 		BaselineTokens: 20_000,
 		ContextWindow:  200_000,
-	}
-	// Effective window 180k, effective used 170k -> 94%, 10k left.
-	got := richFooterContext(usage, LangChinese)
+	}, LangChinese)
 	if !strings.Contains(got, "94%") {
 		t.Errorf("richFooterContext = %q, want 94%% (baseline-excluded)", got)
 	}
-	if !strings.Contains(got, "剩 10.0k") {
-		t.Errorf("richFooterContext = %q, want remaining 10.0k (baseline-excluded)", got)
+	if strings.Contains(got, "🔴") {
+		t.Errorf("richFooterContext = %q, want no alert below %d%%", got, richFooterCtxAlertPct)
+	}
+
+	// Past the threshold the remaining budget appears, also baseline-excluded:
+	// 176k of 180k = 98%, 4k left.
+	got = richFooterContext(&ContextUsage{
+		UsedTokens:     196_000,
+		BaselineTokens: 20_000,
+		ContextWindow:  200_000,
+	}, LangChinese)
+	if !strings.Contains(got, "98%") {
+		t.Errorf("richFooterContext = %q, want 98%% (baseline-excluded)", got)
+	}
+	if !strings.Contains(got, "剩 4.0k") {
+		t.Errorf("richFooterContext = %q, want remaining 4.0k", got)
 	}
 }
 
