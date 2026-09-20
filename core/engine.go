@@ -7230,24 +7230,101 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 	return strings.Join(head, " · ")
 }
 
-// richFooterContext renders the localized context-window percentage, e.g.
-// "ctx 33%" / "上下文 33%". Returns "" when the window size is unknown.
-func richFooterContext(usage *ContextUsage, lang Language) string {
+const (
+	// richFooterCtxBarCells is the fixed width of the context bar.
+	richFooterCtxBarCells = 10
+	// richFooterCtxAlertPct is where the indicator stops being background
+	// information and starts warning. Below it the segment is plain dim text
+	// that stays out of the way; at or above it it gains a red dot and the
+	// remaining token budget, because that is the point where the user has to
+	// act (/compact) rather than merely be informed.
+	richFooterCtxAlertPct = 85
+)
+
+// contextBudget converts a ContextUsage into the used/remaining token figures a
+// footer displays. BaselineTokens — fixed system overhead the user can never
+// reclaim — is subtracted from both, so the numbers describe the space the
+// conversation can actually grow into rather than the raw window. ok is false
+// when the usage carries no usable window or no usage data at all.
+//
+// replyFooterContextText keeps an equivalent copy of this math inline: it has a
+// pinned edge case (window <= baseline renders "0% left" rather than nothing)
+// that does not fit this signature, so the two are deliberately not merged.
+func contextBudget(usage *ContextUsage) (used, remaining, window int, ok bool) {
 	if usage == nil || usage.ContextWindow <= 0 {
-		return ""
+		return 0, 0, 0, false
 	}
-	used := usage.UsedTokens
-	if used <= 0 && usage.TotalTokens > 0 {
-		used = usage.TotalTokens
-	}
+	used = usage.UsedTokens
 	if used <= 0 {
+		switch {
+		case usage.TotalTokens > 0:
+			used = usage.TotalTokens
+		case usage.InputTokens > 0 || usage.OutputTokens > 0:
+			used = usage.InputTokens + usage.OutputTokens
+		default:
+			return 0, 0, 0, false
+		}
+	}
+	baseline := usage.BaselineTokens
+	if baseline < 0 {
+		baseline = 0
+	}
+	if usage.ContextWindow <= baseline {
+		return 0, 0, 0, false
+	}
+	window = usage.ContextWindow - baseline
+	if used -= baseline; used < 0 {
+		used = 0
+	}
+	if used > window {
+		used = window
+	}
+	return used, window - used, window, true
+}
+
+// richFooterCtxBar renders pct as a fixed-width bar of heavy/light box-drawing
+// lines, e.g. 29% -> "━━━───────". Both glyphs are ordinary text rather than
+// emoji, so the bar inherits the footer's dim styling instead of drawing the
+// eye — which is the point: at normal usage this is background information.
+func richFooterCtxBar(pct int) string {
+	filled := int(math.Round(float64(pct) / 100 * richFooterCtxBarCells))
+	if filled < 0 {
+		filled = 0
+	}
+	if filled > richFooterCtxBarCells {
+		filled = richFooterCtxBarCells
+	}
+	return strings.Repeat("━", filled) + strings.Repeat("─", richFooterCtxBarCells-filled)
+}
+
+// richFooterContext renders the localized context indicator as a dim bar plus
+// percentage, e.g. "上下文 ━━━─────── 29%" / "ctx ━━━─────── 29%".
+//
+// Once usage reaches richFooterCtxAlertPct the segment escalates: it gains a red
+// dot — the only colored glyph in an otherwise dim footer — and the remaining
+// token budget, which is the number the user actually acts on:
+//
+//	🔴 上下文 ━━━━━━━━━─ 91% 剩 18k
+//
+// Returns "" when the window size or usage is unknown.
+func richFooterContext(usage *ContextUsage, lang Language) string {
+	used, remaining, window, ok := contextBudget(usage)
+	if !ok {
 		return ""
 	}
-	pct := used * 100 / usage.ContextWindow
+	pct := int(math.Round(float64(used) / float64(window) * 100))
+	if pct < 0 {
+		pct = 0
+	}
 	if pct > 100 {
 		pct = 100
 	}
-	return fmt.Sprintf("%s %d%%", Translate(MsgFooterContext, lang), pct)
+	seg := fmt.Sprintf("%s %s %d%%", Translate(MsgFooterContext, lang), richFooterCtxBar(pct), pct)
+	if pct < richFooterCtxAlertPct {
+		return seg
+	}
+	left := fmt.Sprintf(Translate(MsgFooterRemainingTokens, lang), formatStatusTokenCount(remaining))
+	return fmt.Sprintf("🔴 %s %s", seg, left)
 }
 
 // formatStatusTokenCount renders an integer token count compactly.

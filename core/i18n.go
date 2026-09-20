@@ -382,8 +382,10 @@ const (
 	MsgRichPanelTools        MsgKey = "rich_panel_tools"
 	MsgRichPanelUpdates      MsgKey = "rich_panel_updates"
 
-	// Rich-card footer context label.
-	MsgFooterContext MsgKey = "footer_context"
+	// Rich-card footer context label, plus the remaining-budget suffix that is
+	// appended only once usage crosses richFooterCtxAlertPct.
+	MsgFooterContext         MsgKey = "footer_context"
+	MsgFooterRemainingTokens MsgKey = "footer_remaining_tokens"
 
 	MsgListItem         MsgKey = "list_item"
 	MsgListEmptySummary MsgKey = "list_empty_summary"
@@ -2554,6 +2556,12 @@ var messages = map[MsgKey]map[Language]string{
 	MsgFooterContext: {
 		LangEnglish: "ctx", LangChinese: "上下文", LangTraditionalChinese: "上下文",
 		LangJapanese: "コンテキスト", LangSpanish: "contexto",
+	},
+	// Format string, not a bare label: word order differs per language, and the
+	// argument is an already-formatted compact token count ("18k").
+	MsgFooterRemainingTokens: {
+		LangEnglish: "%s left", LangChinese: "剩 %s", LangTraditionalChinese: "剩 %s",
+		LangJapanese: "残り %s", LangSpanish: "quedan %s",
 	},
 	MsgRichPanelReasoning: {
 		LangEnglish: "Reasoning", LangChinese: "推理", LangTraditionalChinese: "推理",

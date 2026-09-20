@@ -1,0 +1,167 @@
+package core
+
+import (
+	"strings"
+	"testing"
+)
+
+// The context indicator has two jobs that pull against each other: stay out of
+// the way at normal usage, and be impossible to miss once the window is nearly
+// full. These tests pin the boundary between those two states, since that is the
+// only part a reader cannot verify by eye.
+
+func TestRichFooterCtxBar_FillTracksPercent(t *testing.T) {
+	tests := []struct {
+		pct  int
+		want string
+	}{
+		{0, "──────────"},
+		{1, "──────────"},  // rounds down: 0.1 cells
+		{5, "━─────────"},  // rounds up: 0.5 cells
+		{29, "━━━───────"}, // 2.9 -> 3
+		{50, "━━━━━─────"},
+		{68, "━━━━━━━───"}, // 6.8 -> 7
+		{91, "━━━━━━━━━─"}, // 9.1 -> 9, deliberately not full
+		{95, "━━━━━━━━━━"}, // 9.5 -> 10
+		{100, "━━━━━━━━━━"},
+	}
+	for _, tt := range tests {
+		got := richFooterCtxBar(tt.pct)
+		if got != tt.want {
+			t.Errorf("richFooterCtxBar(%d) = %q, want %q", tt.pct, got, tt.want)
+		}
+		// Width must be stable so the footer does not reflow as usage climbs.
+		if n := len([]rune(got)); n != richFooterCtxBarCells {
+			t.Errorf("richFooterCtxBar(%d) width = %d runes, want %d", tt.pct, n, richFooterCtxBarCells)
+		}
+	}
+}
+
+func TestRichFooterCtxBar_ClampsOutOfRange(t *testing.T) {
+	for _, pct := range []int{-50, -1, 101, 1000} {
+		got := richFooterCtxBar(pct)
+		if n := len([]rune(got)); n != richFooterCtxBarCells {
+			t.Errorf("richFooterCtxBar(%d) width = %d runes, want %d", pct, n, richFooterCtxBarCells)
+		}
+	}
+}
+
+func TestRichFooterContext_EscalatesOnlyAtAlertThreshold(t *testing.T) {
+	const window = 200_000
+	tests := []struct {
+		name      string
+		used      int
+		wantAlert bool
+	}{
+		{"well below", 58_700, false},
+		{"mid", 136_000, false},
+		{"one below threshold", (richFooterCtxAlertPct - 1) * window / 100, false},
+		{"exactly at threshold", richFooterCtxAlertPct * window / 100, true},
+		{"nearly full", 182_000, true},
+		{"full", window, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := richFooterContext(&ContextUsage{UsedTokens: tt.used, ContextWindow: window}, LangChinese)
+			hasDot := strings.Contains(got, "🔴")
+			hasLeft := strings.Contains(got, "剩 ")
+			if hasDot != tt.wantAlert || hasLeft != tt.wantAlert {
+				t.Errorf("richFooterContext(used=%d) = %q; alert dot=%v left=%v, want both %v",
+					tt.used, got, hasDot, hasLeft, tt.wantAlert)
+			}
+			// The bar and a percentage are present in both states.
+			if !strings.Contains(got, "上下文 ") || !strings.Contains(got, "%") {
+				t.Errorf("richFooterContext(used=%d) = %q, want label, bar and percent", tt.used, got)
+			}
+		})
+	}
+}
+
+// The alerting number is the one the user acts on, so it must agree with the
+// percentage shown beside it rather than being computed off a different base.
+func TestRichFooterContext_RemainingExcludesBaseline(t *testing.T) {
+	usage := &ContextUsage{
+		UsedTokens:     190_000,
+		BaselineTokens: 20_000,
+		ContextWindow:  200_000,
+	}
+	// Effective window 180k, effective used 170k -> 94%, 10k left.
+	got := richFooterContext(usage, LangChinese)
+	if !strings.Contains(got, "94%") {
+		t.Errorf("richFooterContext = %q, want 94%% (baseline-excluded)", got)
+	}
+	if !strings.Contains(got, "剩 10.0k") {
+		t.Errorf("richFooterContext = %q, want remaining 10.0k (baseline-excluded)", got)
+	}
+}
+
+func TestRichFooterContext_EmptyWithoutUsableUsage(t *testing.T) {
+	tests := []struct {
+		name  string
+		usage *ContextUsage
+	}{
+		{"nil", nil},
+		{"no window", &ContextUsage{UsedTokens: 100}},
+		{"no usage data", &ContextUsage{ContextWindow: 200_000}},
+		{"baseline swallows window", &ContextUsage{UsedTokens: 100, BaselineTokens: 200_000, ContextWindow: 200_000}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := richFooterContext(tt.usage, LangChinese); got != "" {
+				t.Errorf("richFooterContext = %q, want empty", got)
+			}
+		})
+	}
+}
+
+// Falling back to TotalTokens / Input+Output keeps the indicator alive for
+// agents that do not report UsedTokens directly.
+func TestContextBudget_UsedTokenFallbacks(t *testing.T) {
+	tests := []struct {
+		name     string
+		usage    *ContextUsage
+		wantUsed int
+	}{
+		{"prefers UsedTokens", &ContextUsage{UsedTokens: 50, TotalTokens: 99, ContextWindow: 100}, 50},
+		{"falls back to TotalTokens", &ContextUsage{TotalTokens: 60, ContextWindow: 100}, 60},
+		{"falls back to in+out", &ContextUsage{InputTokens: 30, OutputTokens: 40, ContextWindow: 100}, 70},
+		{"clamps overflow to window", &ContextUsage{UsedTokens: 500, ContextWindow: 100}, 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			used, remaining, window, ok := contextBudget(tt.usage)
+			if !ok {
+				t.Fatalf("contextBudget ok = false, want true")
+			}
+			if used != tt.wantUsed {
+				t.Errorf("used = %d, want %d", used, tt.wantUsed)
+			}
+			if used+remaining != window {
+				t.Errorf("used(%d) + remaining(%d) != window(%d)", used, remaining, window)
+			}
+		})
+	}
+}
+
+func TestRichFooterContext_LocalizedAlertSuffix(t *testing.T) {
+	usage := &ContextUsage{UsedTokens: 190_000, ContextWindow: 200_000}
+	tests := []struct {
+		lang Language
+		want string
+	}{
+		{LangEnglish, "left"},
+		{LangChinese, "剩"},
+		{LangTraditionalChinese, "剩"},
+		{LangJapanese, "残り"},
+		{LangSpanish, "quedan"},
+	}
+	for _, tt := range tests {
+		got := richFooterContext(usage, tt.lang)
+		if !strings.Contains(got, tt.want) {
+			t.Errorf("richFooterContext(%s) = %q, want it to contain %q", tt.lang, got, tt.want)
+		}
+		if !strings.Contains(got, "🔴") {
+			t.Errorf("richFooterContext(%s) = %q, want alert dot", tt.lang, got)
+		}
+	}
+}
