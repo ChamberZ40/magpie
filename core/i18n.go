@@ -211,39 +211,42 @@ const (
 	MsgHelpAgentSection          MsgKey = "help_agent_section"
 	MsgHelpToolsSection          MsgKey = "help_tools_section"
 	MsgHelpSystemSection         MsgKey = "help_system_section"
-	MsgHelpTip                   MsgKey = "help_tip"
-	MsgListTitle                 MsgKey = "list_title"
-	MsgListTitlePaged            MsgKey = "list_title_paged"
-	MsgListEmpty                 MsgKey = "list_empty"
-	MsgListMore                  MsgKey = "list_more"
-	MsgListPageHint              MsgKey = "list_page_hint"
-	MsgListSwitchHint            MsgKey = "list_switch_hint"
-	MsgListError                 MsgKey = "list_error"
-	MsgHistoryEmpty              MsgKey = "history_empty"
-	MsgNameUsage                 MsgKey = "name_usage"
-	MsgNameSet                   MsgKey = "name_set"
-	MsgNameNoSession             MsgKey = "name_no_session"
-	MsgProviderNotSupported      MsgKey = "provider_not_supported"
-	MsgProviderNone              MsgKey = "provider_none"
-	MsgProviderCurrent           MsgKey = "provider_current"
-	MsgProviderListTitle         MsgKey = "provider_list_title"
-	MsgProviderListEmpty         MsgKey = "provider_list_empty"
-	MsgProviderSwitchHint        MsgKey = "provider_switch_hint"
-	MsgProviderNotFound          MsgKey = "provider_not_found"
-	MsgProviderSwitched          MsgKey = "provider_switched"
-	MsgProviderCleared           MsgKey = "provider_cleared"
-	MsgProviderAdded             MsgKey = "provider_added"
-	MsgProviderAddUsage          MsgKey = "provider_add_usage"
-	MsgProviderAddFailed         MsgKey = "provider_add_failed"
-	MsgProviderRemoved           MsgKey = "provider_removed"
-	MsgProviderRemoveFailed      MsgKey = "provider_remove_failed"
-	MsgCardTitleProviderAdd      MsgKey = "card_title_provider_add"
-	MsgProviderAddPickHint       MsgKey = "provider_add_pick_hint"
-	MsgProviderAddOther          MsgKey = "provider_add_other"
-	MsgProviderAddApiKeyPrompt   MsgKey = "provider_add_api_key_prompt"
-	MsgProviderAddInviteHint     MsgKey = "provider_add_invite_hint"
-	MsgProviderLinkGlobal        MsgKey = "provider_link_global"
-	MsgProviderLinked            MsgKey = "provider_linked"
+	// Overflow row shown when a deployment declares more custom commands than
+	// the System tab lists; the row links to /commands for the rest.
+	MsgHelpCustomMore          MsgKey = "help_custom_more"
+	MsgHelpTip                 MsgKey = "help_tip"
+	MsgListTitle               MsgKey = "list_title"
+	MsgListTitlePaged          MsgKey = "list_title_paged"
+	MsgListEmpty               MsgKey = "list_empty"
+	MsgListMore                MsgKey = "list_more"
+	MsgListPageHint            MsgKey = "list_page_hint"
+	MsgListSwitchHint          MsgKey = "list_switch_hint"
+	MsgListError               MsgKey = "list_error"
+	MsgHistoryEmpty            MsgKey = "history_empty"
+	MsgNameUsage               MsgKey = "name_usage"
+	MsgNameSet                 MsgKey = "name_set"
+	MsgNameNoSession           MsgKey = "name_no_session"
+	MsgProviderNotSupported    MsgKey = "provider_not_supported"
+	MsgProviderNone            MsgKey = "provider_none"
+	MsgProviderCurrent         MsgKey = "provider_current"
+	MsgProviderListTitle       MsgKey = "provider_list_title"
+	MsgProviderListEmpty       MsgKey = "provider_list_empty"
+	MsgProviderSwitchHint      MsgKey = "provider_switch_hint"
+	MsgProviderNotFound        MsgKey = "provider_not_found"
+	MsgProviderSwitched        MsgKey = "provider_switched"
+	MsgProviderCleared         MsgKey = "provider_cleared"
+	MsgProviderAdded           MsgKey = "provider_added"
+	MsgProviderAddUsage        MsgKey = "provider_add_usage"
+	MsgProviderAddFailed       MsgKey = "provider_add_failed"
+	MsgProviderRemoved         MsgKey = "provider_removed"
+	MsgProviderRemoveFailed    MsgKey = "provider_remove_failed"
+	MsgCardTitleProviderAdd    MsgKey = "card_title_provider_add"
+	MsgProviderAddPickHint     MsgKey = "provider_add_pick_hint"
+	MsgProviderAddOther        MsgKey = "provider_add_other"
+	MsgProviderAddApiKeyPrompt MsgKey = "provider_add_api_key_prompt"
+	MsgProviderAddInviteHint   MsgKey = "provider_add_invite_hint"
+	MsgProviderLinkGlobal      MsgKey = "provider_link_global"
+	MsgProviderLinked          MsgKey = "provider_linked"
 
 	MsgVoiceNotEnabled               MsgKey = "voice_not_enabled"
 	MsgVoiceUsingPlatformRecognition MsgKey = "voice_using_platform_recognition"
@@ -1392,6 +1395,13 @@ var messages = map[MsgKey]map[Language]string{
 			"/restart — Reiniciar servicio\n" +
 			"/status — Estado del sistema\n" +
 			"/version — Mostrar versión",
+	},
+	MsgHelpCustomMore: {
+		LangEnglish:            "and %d more — see the full list",
+		LangChinese:            "还有 %d 个 — 查看完整列表",
+		LangTraditionalChinese: "還有 %d 個 — 查看完整列表",
+		LangJapanese:           "他 %d 件 — 一覧を表示",
+		LangSpanish:            "y %d más — ver la lista completa",
 	},
 	MsgHelpTip: {
 		LangEnglish:            "Tip: Commands support prefix matching, e.g. /pro l = /provider list",

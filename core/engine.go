@@ -9294,9 +9294,23 @@ func (e *Engine) cmdStart(p Platform, msg *Message) {
 
 const defaultHelpGroup = "session"
 
+// helpCardCustomMax caps how many custom commands the help card lists. Each one
+// is a tappable row sharing the System tab with the built-ins, so an agent
+// command directory with dozens of *.md files would otherwise bury them. The
+// overflow row links to /commands, which renders the full list as text.
+const helpCardCustomMax = 12
+
+// helpCardCustomHostGroup is the tab custom commands are appended to.
+const helpCardCustomHostGroup = "system"
+
 type helpCardItem struct {
 	command string
 	action  string
+	// desc overrides the i18n lookup in renderHelpGroupCard's commandText.
+	// Built-in rows leave it empty and are translated by command name; custom
+	// commands carry their own description and have no translation entry, so
+	// without this they would render as their bare name.
+	desc string
 }
 
 type helpCardGroup struct {
@@ -9372,6 +9386,79 @@ func helpCardGroups() []helpCardGroup {
 	}
 }
 
+// helpCardGroups returns the static built-in groups with any custom commands
+// appended to the System tab. They live there rather than in a tab of their own:
+// a deployment-specific command like /codex is a system-level knob, and a fifth
+// tab would exist only to hold two rows on most installs.
+func (e *Engine) helpCardGroups() []helpCardGroup {
+	groups := helpCardGroups()
+	custom := e.helpCardCustomItems()
+	if len(custom) == 0 {
+		return groups
+	}
+	// Rebuild rather than appending into groups[i].items in place, so the static
+	// table stays the single source of truth for the built-in rows.
+	out := make([]helpCardGroup, len(groups))
+	for i, g := range groups {
+		if g.key == helpCardCustomHostGroup {
+			g.items = append(append([]helpCardItem{}, g.items...), custom...)
+		}
+		out[i] = g
+	}
+	return out
+}
+
+// helpCardCustomItems renders the [[commands]] entries and agent command files
+// as help rows, sorted by name — CommandRegistry.ListAll walks a map, so without
+// this the rows would shuffle between renders of the same card.
+func (e *Engine) helpCardCustomItems() []helpCardItem {
+	if e.commands == nil {
+		return nil
+	}
+	cmds := e.commands.ListAll()
+	if len(cmds) == 0 {
+		return nil
+	}
+	sorted := make([]*CustomCommand, len(cmds))
+	copy(sorted, cmds)
+	sort.Slice(sorted, func(i, j int) bool {
+		return strings.ToLower(sorted[i].Name) < strings.ToLower(sorted[j].Name)
+	})
+
+	shown := sorted
+	if len(shown) > helpCardCustomMax {
+		shown = shown[:helpCardCustomMax]
+	}
+	items := make([]helpCardItem, 0, len(shown)+1)
+	for _, c := range shown {
+		items = append(items, helpCardItem{
+			command: "/" + c.Name,
+			action:  "cmd:/" + c.Name,
+			desc:    helpCardCustomDesc(c),
+		})
+	}
+	if remaining := len(sorted) - len(shown); remaining > 0 {
+		items = append(items, helpCardItem{
+			command: "/commands",
+			action:  "nav:/commands",
+			desc:    e.i18n.Tf(MsgHelpCustomMore, remaining),
+		})
+	}
+	return items
+}
+
+// helpCardCustomDesc mirrors renderCommandsCard's fallback chain: a command with
+// no description is described by whatever it actually does.
+func helpCardCustomDesc(c *CustomCommand) string {
+	if desc := strings.TrimSpace(c.Description); desc != "" {
+		return truncateStr(desc, 60)
+	}
+	if c.Exec != "" {
+		return "$ " + truncateStr(c.Exec, 60)
+	}
+	return truncateStr(c.Prompt, 60)
+}
+
 func (e *Engine) renderHelpCard() *Card {
 	return e.renderHelpGroupCard(defaultHelpGroup)
 }
@@ -9404,11 +9491,15 @@ func (e *Engine) renderHelpGroupCard(groupKey string) *Card {
 	tabLabel := func(key MsgKey) string {
 		return strings.Trim(sectionTitle(key), "* ")
 	}
-	commandText := func(command string) string {
-		return "**" + command + "**  " + e.i18n.T(MsgKey(strings.TrimPrefix(command, "/")))
+	commandText := func(item helpCardItem) string {
+		desc := item.desc
+		if desc == "" {
+			desc = e.i18n.T(MsgKey(strings.TrimPrefix(item.command, "/")))
+		}
+		return "**" + item.command + "**  " + desc
 	}
 
-	groups := helpCardGroups()
+	groups := e.helpCardGroups()
 	current := groups[0]
 	normalizedGroup := strings.ToLower(strings.TrimSpace(groupKey))
 	for _, group := range groups {
@@ -9431,7 +9522,7 @@ func (e *Engine) renderHelpGroupCard(groupKey string) *Card {
 		cb.ButtonsEqual(row...)
 	}
 	for _, item := range current.items {
-		cb.ListItem(commandText(item.command), "▶", item.action)
+		cb.ListItem(commandText(item), "▶", item.action)
 	}
 	cb.Note(e.i18n.T(MsgHelpTip))
 	return cb.Build()
