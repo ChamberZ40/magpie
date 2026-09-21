@@ -47,7 +47,7 @@ func TestBuiltinCommands_ArgTakingCommandsAdvertiseArgs(t *testing.T) {
 	// description does not follow.
 	withArgs := []string{
 		"model", "reasoning", "mode", "lang", "provider", "memory", "allow",
-		"quiet", "tts", "timer", "heartbeat", "web", "workspace", "cron",
+		"quiet", "tts", "timer", "heartbeat", "web", "workspace", "cron", "git",
 	}
 	for _, id := range withArgs {
 		desc := Translate(MsgKey(id), LangEnglish)

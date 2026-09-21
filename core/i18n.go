@@ -605,9 +605,16 @@ const (
 	MsgBuiltinCmdWorkspace MsgKey = "workspace"
 	MsgBuiltinCmdWhoami    MsgKey = "whoami"
 	MsgBuiltinCmdWeb       MsgKey = "web"
+	MsgBuiltinCmdGit       MsgKey = "git"
 
 	MsgDiffEmpty       MsgKey = "diff_empty"
 	MsgDiffNoDiff2HTML MsgKey = "diff_no_diff2html"
+
+	// /git rejects what it cannot run rather than guessing.
+	MsgGitUsage    MsgKey = "git_usage"
+	MsgGitBadRef   MsgKey = "git_bad_ref"
+	MsgGitBadCount MsgKey = "git_bad_count"
+	MsgGitNoOutput MsgKey = "git_no_output"
 
 	MsgDirChanged          MsgKey = "dir_changed"
 	MsgDirCurrent          MsgKey = "dir_current"
@@ -3811,6 +3818,41 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "查看/設定 Web 控制台，參數: [status|setup]",
 		LangJapanese:           "Web コンソールの表示/設定、引数: [status|setup]",
 		LangSpanish:            "Ver/configurar la consola web, arg: [status|setup]",
+	},
+	MsgBuiltinCmdGit: {
+		LangEnglish:            "Read-only git queries, arg: [status|log [n]|branch|show [ref]]",
+		LangChinese:            "只读 git 查询，参数: [status|log [n]|branch|show [ref]]",
+		LangTraditionalChinese: "唯讀 git 查詢，參數: [status|log [n]|branch|show [ref]]",
+		LangJapanese:           "読み取り専用の git 照会、引数: [status|log [n]|branch|show [ref]]",
+		LangSpanish:            "Consultas git de solo lectura, arg: [status|log [n]|branch|show [ref]]",
+	},
+	MsgGitUsage: {
+		LangEnglish:            "Usage: `/git [status | log [n] | branch | show [ref]]`\nRead-only. Use `/diff` for the working-tree diff.",
+		LangChinese:            "用法: `/git [status | log [n] | branch | show [ref]]`\n仅供查询。工作区差异请用 `/diff`。",
+		LangTraditionalChinese: "用法: `/git [status | log [n] | branch | show [ref]]`\n僅供查詢。工作區差異請用 `/diff`。",
+		LangJapanese:           "使い方: `/git [status | log [n] | branch | show [ref]]`\n読み取り専用です。作業ツリーの差分は `/diff` を使ってください。",
+		LangSpanish:            "Uso: `/git [status | log [n] | branch | show [ref]]`\nSolo lectura. Usa `/diff` para el diff del árbol de trabajo.",
+	},
+	MsgGitBadRef: {
+		LangEnglish:            "Not a usable git ref: `%s`",
+		LangChinese:            "不是可用的 git 引用: `%s`",
+		LangTraditionalChinese: "不是可用的 git 參考: `%s`",
+		LangJapanese:           "使用できない git ref です: `%s`",
+		LangSpanish:            "No es una referencia git utilizable: `%s`",
+	},
+	MsgGitBadCount: {
+		LangEnglish:            "Count must be a whole number between 1 and %d.",
+		LangChinese:            "条数必须是 1 到 %d 之间的整数。",
+		LangTraditionalChinese: "筆數必須是 1 到 %d 之間的整數。",
+		LangJapanese:           "件数は 1 から %d までの整数で指定してください。",
+		LangSpanish:            "El número debe ser un entero entre 1 y %d.",
+	},
+	MsgGitNoOutput: {
+		LangEnglish:            "`git %s` produced no output.",
+		LangChinese:            "`git %s` 没有输出。",
+		LangTraditionalChinese: "`git %s` 沒有輸出。",
+		LangJapanese:           "`git %s` の出力はありません。",
+		LangSpanish:            "`git %s` no produjo ninguna salida.",
 	},
 	MsgDiffEmpty: {
 		LangEnglish:            "No diff — clean working tree (or no changes vs `%s`).",

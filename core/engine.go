@@ -1217,7 +1217,7 @@ func (e *Engine) SetAdminFrom(adminFrom string) {
 	shellDisabled := e.disabledCmds["shell"]
 	e.userRolesMu.Unlock()
 	if af == "" && !shellDisabled {
-		slog.Warn("admin_from is not set — privileged commands (/shell, /show, /dir, /restart) are blocked. "+
+		slog.Warn("admin_from is not set — privileged commands (/shell, /show, /dir, /restart, /diff, /git, /web) are blocked. "+
 			"Set admin_from in config to enable them, or use disabled_commands to hide them.",
 			"project", e.name)
 	}
@@ -1231,6 +1231,10 @@ var privilegedCommands = map[string]bool{
 	"restart": true,
 	"web":     true,
 	"diff":    true,
+	// /git is read-only, but it reports paths, branch names and commit
+	// messages from the tree — the same class of disclosure as /diff, so it
+	// sits behind the same gate.
+	"git": true,
 }
 
 // isPrivilegedCommandInvocation extends the privilegedCommands map to
@@ -6335,6 +6339,7 @@ var builtinCommands = []struct {
 	{[]string{"whoami", "myid"}, "whoami"},
 	{[]string{"web"}, "web"},
 	{[]string{"diff"}, "diff"},
+	{[]string{"git"}, "git"},
 	{[]string{"ps", "btw"}, "ps"},
 }
 
@@ -6564,6 +6569,8 @@ func (e *Engine) handleCommand(p Platform, msg *Message, raw string) bool {
 		e.cmdShell(p, msg, raw)
 	case "diff":
 		e.cmdDiff(p, msg, raw)
+	case "git":
+		e.cmdGit(p, msg, args)
 	case "show":
 		e.cmdShow(p, msg, args)
 	case "dir":
