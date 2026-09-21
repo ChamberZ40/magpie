@@ -27,6 +27,7 @@ type ProjectSettingsUpdate struct {
 	AgentType            *string
 	ShowContextIndicator *bool
 	ShowWorkdirIndicator *bool
+	ShowGitIndicator     *bool
 	ReplyFooter          *bool
 	InjectSender         *bool
 	PlatformAllowFrom    map[string]string
@@ -718,6 +719,7 @@ func (m *ManagementServer) handleProjectDetail(w http.ResponseWriter, r *http.Re
 			AgentType            *string           `json:"agent_type"`
 			ShowContextIndicator *bool             `json:"show_context_indicator"`
 			ShowWorkdirIndicator *bool             `json:"show_workdir_indicator"`
+			ShowGitIndicator     *bool             `json:"show_git_indicator"`
 			ReplyFooter          *bool             `json:"reply_footer"`
 			InjectSender         *bool             `json:"inject_sender"`
 			PlatformAllowFrom    map[string]string `json:"platform_allow_from"`
@@ -771,6 +773,9 @@ func (m *ManagementServer) handleProjectDetail(w http.ResponseWriter, r *http.Re
 		if body.ShowWorkdirIndicator != nil {
 			e.SetShowWorkdirIndicator(*body.ShowWorkdirIndicator)
 		}
+		if body.ShowGitIndicator != nil {
+			e.SetShowGitIndicator(*body.ShowGitIndicator)
+		}
 		if body.ReplyFooter != nil {
 			e.SetReplyFooterEnabled(*body.ReplyFooter)
 		}
@@ -805,6 +810,7 @@ func (m *ManagementServer) handleProjectDetail(w http.ResponseWriter, r *http.Re
 				AgentType:            body.AgentType,
 				ShowContextIndicator: body.ShowContextIndicator,
 				ShowWorkdirIndicator: body.ShowWorkdirIndicator,
+				ShowGitIndicator:     body.ShowGitIndicator,
 				ReplyFooter:          body.ReplyFooter,
 				InjectSender:         body.InjectSender,
 				PlatformAllowFrom:    body.PlatformAllowFrom,

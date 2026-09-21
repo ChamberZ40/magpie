@@ -20,6 +20,7 @@ export interface ProjectDetail {
   agent_mode?: string;
   show_context_indicator?: boolean;
   show_workdir_indicator?: boolean;
+  show_git_indicator?: boolean;
   reply_footer?: boolean;
   inject_sender?: boolean;
   provider_refs?: string[];
@@ -49,6 +50,7 @@ export interface ProjectSettingsUpdate {
   agent_type?: string;
   show_context_indicator?: boolean;
   show_workdir_indicator?: boolean;
+  show_git_indicator?: boolean;
   reply_footer?: boolean;
   inject_sender?: boolean;
   platform_allow_from?: Record<string, string>;

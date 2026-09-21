@@ -510,6 +510,11 @@ type ProjectConfig struct {
 	// ShowWorkdirIndicator: nil/true = render the reply footer's second line
 	// (workspace directory); false = hide that line. Subordinate to ReplyFooter.
 	ShowWorkdirIndicator *bool `toml:"show_workdir_indicator,omitempty"`
+	// ShowGitIndicator: nil/true = carry the branch checked out in the work dir
+	// in the rich footer; false = omit it. Its own flag rather than part of
+	// ShowWorkdirIndicator, so hiding the path does not hide the branch.
+	// Subordinate to ReplyFooter.
+	ShowGitIndicator *bool `toml:"show_git_indicator,omitempty"`
 	// ReplyFooter: nil/true = render the reply footer; false = disable it
 	// entirely (the per-line indicator flags above become no-ops).
 	ReplyFooter      *bool        `toml:"reply_footer,omitempty"`
@@ -3372,6 +3377,7 @@ type ProjectSettingsUpdate struct {
 	AgentType            *string
 	ShowContextIndicator *bool
 	ShowWorkdirIndicator *bool
+	ShowGitIndicator     *bool
 	ReplyFooter          *bool
 	InjectSender         *bool
 	PlatformAllowFrom    map[string]string
@@ -3454,6 +3460,10 @@ func SaveProjectSettings(projectName string, update ProjectSettingsUpdate) error
 		if update.ShowWorkdirIndicator != nil {
 			v := *update.ShowWorkdirIndicator
 			proj.ShowWorkdirIndicator = &v
+		}
+		if update.ShowGitIndicator != nil {
+			v := *update.ShowGitIndicator
+			proj.ShowGitIndicator = &v
 		}
 		if update.ReplyFooter != nil {
 			v := *update.ReplyFooter
@@ -3543,6 +3553,9 @@ func GetProjectConfigDetails(projectName string) map[string]any {
 		}
 		if p.ShowWorkdirIndicator != nil {
 			result["show_workdir_indicator"] = *p.ShowWorkdirIndicator
+		}
+		if p.ShowGitIndicator != nil {
+			result["show_git_indicator"] = *p.ShowGitIndicator
 		}
 		if p.ReplyFooter != nil {
 			result["reply_footer"] = *p.ReplyFooter

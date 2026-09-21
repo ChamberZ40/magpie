@@ -66,6 +66,7 @@ export default function ProjectDetail() {
   const [agentMode, setAgentMode] = useState('');
   const [showCtxIndicator, setShowCtxIndicator] = useState(true);
   const [showWorkdirIndicator, setShowWorkdirIndicator] = useState(true);
+  const [showGitIndicator, setShowGitIndicator] = useState(true);
   const [replyFooter, setReplyFooter] = useState(true);
   const [injectSender, setInjectSender] = useState(false);
   const [platformAllowFrom, setPlatformAllowFrom] = useState<Record<string, string>>({});
@@ -160,6 +161,7 @@ export default function ProjectDetail() {
         setSelectedAgentType(proj.value.agent_type || '');
         setShowCtxIndicator(proj.value.show_context_indicator !== false);
         setShowWorkdirIndicator(proj.value.show_workdir_indicator !== false);
+        setShowGitIndicator(proj.value.show_git_indicator !== false);
         setReplyFooter(proj.value.reply_footer !== false);
         setInjectSender(proj.value.inject_sender === true);
         setProviderRefs(proj.value.provider_refs || []);
@@ -209,6 +211,7 @@ export default function ProjectDetail() {
         ...(agentTypeChanged ? { agent_type: selectedAgentType } : {}),
         show_context_indicator: showCtxIndicator,
         show_workdir_indicator: showWorkdirIndicator,
+        show_git_indicator: showGitIndicator,
         reply_footer: replyFooter,
         inject_sender: injectSender,
         platform_allow_from: platformAllowFrom,
@@ -590,6 +593,18 @@ export default function ProjectDetail() {
                 className={cn('w-10 h-6 rounded-full transition-colors', showWorkdirIndicator ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700')}
               >
                 <div className={cn('w-4 h-4 bg-white rounded-full transition-transform mx-1', showWorkdirIndicator ? 'translate-x-4' : 'translate-x-0')} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('projects.showGitIndicator', 'Footer: git branch')}</label>
+                <p className="text-[11px] text-gray-400 mt-0.5">{t('projects.showGitIndicatorHint', 'Show the branch checked out in the work dir; omitted when it is not a git repository')}</p>
+              </div>
+              <button
+                onClick={() => setShowGitIndicator(!showGitIndicator)}
+                className={cn('w-10 h-6 rounded-full transition-colors', showGitIndicator ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700')}
+              >
+                <div className={cn('w-4 h-4 bg-white rounded-full transition-transform mx-1', showGitIndicator ? 'translate-x-4' : 'translate-x-0')} />
               </button>
             </div>
             <div className="flex items-center justify-between">

@@ -742,6 +742,10 @@ name = "my-backend"
 #                                   # 隐藏 footer 第一行：model · [effort ·] out/in/cw/cr · ctx %（默认 true 显示）
 # show_workdir_indicator = false   # Hide the footer's second line: workspace directory (default: true)
 #                                   # 隐藏 footer 第二行：工作区目录（默认 true 显示）
+# show_git_indicator = false       # Hide the branch checked out in the work dir (default: true)
+#                                   # 隐藏工作目录当前所在的 git 分支（默认 true 显示）
+#                                   # Read from .git/HEAD; omitted when the dir is not a repository.
+#                                   # Independent of show_workdir_indicator: hiding the path keeps the branch.
 # disabled_commands = ["restart", "shell", "cron"]  # Disable specific commands for this project
 #                                                     # 禁用该项目的指定命令
 #

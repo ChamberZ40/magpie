@@ -423,10 +423,13 @@ type Engine struct {
 	// Reply footer composition flags. The footer renders up to two lines:
 	//   line 1 — model · [effort ·] out/in/cw/cr · ctx%   (gated by showContextIndicator)
 	//   line 2 — workspace directory                       (gated by showWorkdirIndicator)
+	// The rich footer adds the checked-out git branch (gated by showGitIndicator),
+	// kept separate from the work dir so hiding the path does not hide the branch.
 	// replyFooterEnabled is the master toggle: when false, no footer is emitted
 	// regardless of the per-line flags.
 	showContextIndicator bool
 	showWorkdirIndicator bool
+	showGitIndicator     bool
 	replyFooterEnabled   bool
 
 	// When true, /list etc. only show sessions tracked by cc-connect,
@@ -753,6 +756,7 @@ func NewEngine(name string, ag Agent, platforms []Platform, sessionStorePath str
 		maxQueuedMessages:     defaultMaxQueuedMessages,
 		showContextIndicator:  true,
 		showWorkdirIndicator:  true,
+		showGitIndicator:      true,
 		shell:                 defaultShell(),
 		shellFlag:             defaultShellFlag(),
 		pendingRestartTimeout: defaultPendingRestartTimeout,
@@ -972,10 +976,16 @@ func (e *Engine) SetShowWorkdirIndicator(show bool) {
 	e.showWorkdirIndicator = show
 }
 
+// SetShowGitIndicator controls whether the rich footer carries the branch
+// checked out in the work dir. Subordinate to SetReplyFooterEnabled.
+func (e *Engine) SetShowGitIndicator(show bool) {
+	e.showGitIndicator = show
+}
+
 // SetReplyFooterEnabled is the master toggle for the per-turn reply footer.
 // When false, no footer (statusline-style or single-line) is emitted, and the
-// per-line flags (SetShowContextIndicator / SetShowWorkdirIndicator) become
-// no-ops.
+// per-line flags (SetShowContextIndicator / SetShowWorkdirIndicator /
+// SetShowGitIndicator) become no-ops.
 func (e *Engine) SetReplyFooterEnabled(show bool) {
 	e.replyFooterEnabled = show
 }
@@ -7227,6 +7237,12 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 		}
 	}
 
+	if e.showGitIndicator {
+		if branch := gitBranch(resolveFooterWorkDir(session, agent, workspaceDir)); branch != "" {
+			head = append(head, richFooterGitGlyph+" "+branch)
+		}
+	}
+
 	return strings.Join(head, " · ")
 }
 
@@ -7547,6 +7563,16 @@ func replyFooterContextText(usage *ContextUsage, i18n *I18n) string {
 }
 
 func replyFooterWorkDir(session AgentSession, agent Agent, workspaceDir string) string {
+	dir := resolveFooterWorkDir(session, agent, workspaceDir)
+	if dir == "" {
+		return ""
+	}
+	return compactReplyFooterPath(dir)
+}
+
+// resolveFooterWorkDir finds the directory the turn ran in, uncompacted. The
+// git lookup needs a path the filesystem will accept, which "~/code/x" is not.
+func resolveFooterWorkDir(session AgentSession, agent Agent, workspaceDir string) string {
 	dir := strings.TrimSpace(workspaceDir)
 	if dir == "" {
 		if session != nil {
@@ -7565,10 +7591,7 @@ func replyFooterWorkDir(session AgentSession, agent Agent, workspaceDir string) 
 			dir = strings.TrimSpace(wd.GetWorkDir())
 		}
 	}
-	if dir == "" {
-		return ""
-	}
-	return compactReplyFooterPath(dir)
+	return dir
 }
 
 func compactReplyFooterPath(path string) string {
