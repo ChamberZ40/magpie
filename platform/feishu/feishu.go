@@ -6442,10 +6442,7 @@ func richPlaceholderElement(text string) map[string]any {
 	}
 }
 
-func richPanelElements(steps []core.ToolStep, emptyText string) []map[string]any {
-	if len(steps) == 0 {
-		return []map[string]any{richPlaceholderElement(emptyText)}
-	}
+func richPanelElements(steps []core.ToolStep, lang string) []map[string]any {
 	const maxPanelSteps = 10
 	visible := steps
 	hidden := 0
@@ -6455,7 +6452,8 @@ func richPanelElements(steps []core.ToolStep, emptyText string) []map[string]any
 	}
 	elements := make([]map[string]any, 0, len(visible)+1)
 	if hidden > 0 {
-		elements = append(elements, richPlaceholderElement(fmt.Sprintf("... %d earlier steps hidden", hidden)))
+		elements = append(elements, richPlaceholderElement(
+			fmt.Sprintf(core.Translate(core.MsgRichPanelHiddenSteps, core.Language(lang)), hidden)))
 	}
 	for _, step := range visible {
 		elements = append(elements, richStepElement(step))
@@ -6539,23 +6537,20 @@ func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.To
 		panelMaps = append(panelMaps, buildCollapsiblePanel(
 			richPanelLabel(core.MsgRichPanelReasoning, len(reasoningSteps), lang),
 			streaming,
-			richPanelElements(reasoningSteps, "Thinking..."),
+			richPanelElements(reasoningSteps, lang),
 		))
 	}
 	if len(toolSteps) > 0 {
 		panelMaps = append(panelMaps, buildCollapsiblePanel(
 			richPanelLabel(core.MsgRichPanelTools, len(toolSteps), lang),
 			streaming,
-			richPanelElements(toolSteps, "No tool steps"),
+			richPanelElements(toolSteps, lang),
 		))
 	}
-	if len(panelMaps) == 0 && streaming {
-		panelMaps = append(panelMaps, buildCollapsiblePanel(
-			richPanelLabel(core.MsgRichPanelReasoning, 0, lang),
-			true,
-			richPanelElements(nil, "Thinking..."),
-		))
-	}
+	// No panel when there is nothing to put in one. A turn that answers without
+	// calling a tool used to get an empty Reasoning panel holding a placeholder,
+	// which claimed a section of the card to say nothing — the status header
+	// already reports that the turn is running.
 
 	markdownMap := map[string]any{
 		"tag":        "markdown",

@@ -384,6 +384,9 @@ const (
 	MsgRichPanelReasoning    MsgKey = "rich_panel_reasoning"
 	MsgRichPanelTools        MsgKey = "rich_panel_tools"
 	MsgRichPanelUpdates      MsgKey = "rich_panel_updates"
+	// Stands in for the steps trimmed off the top of an over-long panel.
+	// Takes the hidden count.
+	MsgRichPanelHiddenSteps MsgKey = "rich_panel_hidden_steps"
 
 	// Rich-card footer context label, plus the remaining-budget suffix that is
 	// appended only once usage crosses richFooterCtxAlertPct.
@@ -2595,6 +2598,11 @@ var messages = map[MsgKey]map[Language]string{
 	MsgRichPanelUpdates: {
 		LangEnglish: "Updates", LangChinese: "更新", LangTraditionalChinese: "更新",
 		LangJapanese: "更新", LangSpanish: "Actualizaciones",
+	},
+	MsgRichPanelHiddenSteps: {
+		LangEnglish: "... %d earlier steps hidden", LangChinese: "... 已隐藏 %d 个更早的步骤",
+		LangTraditionalChinese: "... 已隱藏 %d 個更早的步驟",
+		LangJapanese:           "... 以前のステップ %d 件を非表示", LangSpanish: "... %d pasos anteriores ocultos",
 	},
 	MsgCardTitleMode: {
 		LangEnglish: "Permission Mode", LangChinese: "权限模式", LangTraditionalChinese: "權限模式",
