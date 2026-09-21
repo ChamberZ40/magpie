@@ -44,6 +44,45 @@ func TestRichFooter_ShowsGitBranch(t *testing.T) {
 	}
 }
 
+// The footer is two lines: what the turn did, then where it ran. Crowding both
+// onto one line pushed the context bar off the visible width once a real
+// workdir path was in there.
+func TestRichFooter_PlaceGoesOnTheSecondLine(t *testing.T) {
+	dir := gitRepoDir(t, "main")
+	e := newGitFooterEngine(t, dir)
+	e.SetShowContextIndicator(true)
+
+	got := e.composeRichStatusFooter(false, time.Now(), e.agent, nil, dir)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("footer = %q, want exactly 2 lines, got %d", got, len(lines))
+	}
+	if strings.Contains(lines[0], "⎇") || strings.Contains(lines[0], compactReplyFooterPath(dir)) {
+		t.Errorf("line 1 = %q, want no workdir or branch on it", lines[0])
+	}
+	if !strings.Contains(lines[1], "⎇ main") {
+		t.Errorf("line 2 = %q, want the branch", lines[1])
+	}
+	if !strings.Contains(lines[1], compactReplyFooterPath(dir)) {
+		t.Errorf("line 2 = %q, want the work dir", lines[1])
+	}
+}
+
+// With nothing to say about the place, there is no blank second line.
+func TestRichFooter_NoSecondLineWhenPlaceIsEmpty(t *testing.T) {
+	dir := t.TempDir() // not a repository
+	e := newGitFooterEngine(t, dir)
+	e.SetShowWorkdirIndicator(false)
+
+	got := e.composeRichStatusFooter(false, time.Now(), e.agent, nil, dir)
+	if strings.Contains(got, "\n") {
+		t.Errorf("footer = %q, want a single line", got)
+	}
+	if strings.TrimSpace(got) == "" {
+		t.Errorf("footer = %q, want line 1 to survive", got)
+	}
+}
+
 func TestRichFooter_OmitsGitBranchOutsideRepo(t *testing.T) {
 	dir := t.TempDir()
 	e := newGitFooterEngine(t, dir)

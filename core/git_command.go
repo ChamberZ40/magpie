@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strconv"
@@ -140,16 +141,25 @@ func (e *Engine) cmdGit(p Platform, msg *Message, args []string) {
 	if len(args) > 0 {
 		name = strings.TrimSpace(args[0])
 	}
+
+	arg := ""
+	if len(args) > 1 {
+		arg = strings.TrimSpace(strings.Join(args[1:], " "))
+	}
+
+	// "footer" is a setting, not a query, so it is handled before the argv
+	// table — which stays purely read-only argv builders.
+	if isGitFooterSubcommand(name) {
+		e.gitFooterToggle(p, msg, arg)
+		return
+	}
+
 	sub, ok := lookupGitSubcommand(name)
 	if !ok {
 		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgGitUsage))
 		return
 	}
 
-	arg := ""
-	if len(args) > 1 {
-		arg = strings.TrimSpace(strings.Join(args[1:], " "))
-	}
 	gitArgs, err := sub.build(e, arg)
 	if err != nil {
 		e.reply(p, msg.ReplyCtx, err.Error())
@@ -167,6 +177,62 @@ func (e *Engine) cmdGit(p Platform, msg *Message, args []string) {
 	}
 
 	go e.runGitQuery(p, msg, sub.names[0], gitArgs, workDir)
+}
+
+// gitFooterSubcommandNames are the spellings that reach the footer toggle.
+var gitFooterSubcommandNames = []string{"footer", "branch-footer"}
+
+func isGitFooterSubcommand(name string) bool {
+	for _, n := range gitFooterSubcommandNames {
+		if strings.EqualFold(n, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// gitFooterToggle implements /git footer [on|off]. With no argument it reports
+// the current setting rather than guessing which way the user meant to flip it.
+func (e *Engine) gitFooterToggle(p Platform, msg *Message, arg string) {
+	show, ok := parseGitFooterArg(arg, e.gitIndicatorEnabled())
+	if !ok {
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgGitFooterUsage))
+		return
+	}
+
+	e.SetShowGitIndicator(show)
+
+	// Persisted so the choice survives a restart. A failure here still leaves
+	// the running setting applied, so say so rather than claiming success.
+	if e.footerGitSaveFunc != nil {
+		if err := e.footerGitSaveFunc(show); err != nil {
+			slog.Error("failed to persist show_git_indicator after /git footer", "error", err)
+			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgGitFooterNotPersisted))
+			return
+		}
+	}
+
+	if show {
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgGitFooterOn))
+		return
+	}
+	e.reply(p, msg.ReplyCtx, e.i18n.T(MsgGitFooterOff))
+}
+
+// parseGitFooterArg maps the argument to the setting it asks for. An empty
+// argument means "show me what it is now", which is current unchanged.
+func parseGitFooterArg(arg string, current bool) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(arg)) {
+	case "on", "show", "yes", "true", "1", "开":
+		return true, true
+	case "off", "hide", "no", "false", "0", "关":
+		return false, true
+	case "toggle":
+		return !current, true
+	case "":
+		return current, true
+	}
+	return false, false
 }
 
 // runGitQuery executes one git argv and reports whatever it produced. Git's own

@@ -417,6 +417,12 @@ func main() {
 			showGit = *proj.ShowGitIndicator
 		}
 		engine.SetShowGitIndicator(showGit)
+		// /git footer flips the setting from chat; persist it so the choice
+		// survives a restart instead of silently reverting.
+		projectName := proj.Name
+		engine.SetFooterGitSaveFunc(func(show bool) error {
+			return config.SaveProjectSettings(projectName, config.ProjectSettingsUpdate{ShowGitIndicator: &show})
+		})
 		engine.SetReplyFooterEnabled(showFooter)
 		engine.SetAttachmentSendEnabled(cfg.AttachmentSend != "off")
 		engine.SetFilterExternalSessions(proj.FilterExternalSessions != nil && *proj.FilterExternalSessions)

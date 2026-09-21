@@ -373,8 +373,9 @@ type Engine struct {
 	commandSaveAddFunc func(name, description, prompt, exec, workDir string) error
 	commandSaveDelFunc func(name string) error
 
-	displaySaveFunc  func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolMessages *bool) error
-	configReloadFunc func() (*ConfigReloadResult, error)
+	displaySaveFunc   func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolMessages *bool) error
+	footerGitSaveFunc func(show bool) error
+	configReloadFunc  func() (*ConfigReloadResult, error)
 
 	hooks              *HookManager
 	cronScheduler      *CronScheduler
@@ -421,15 +422,19 @@ type Engine struct {
 	resetOnIdle           time.Duration
 
 	// Reply footer composition flags. The footer renders up to two lines:
-	//   line 1 — model · [effort ·] out/in/cw/cr · ctx%   (gated by showContextIndicator)
-	//   line 2 — workspace directory                       (gated by showWorkdirIndicator)
-	// The rich footer adds the checked-out git branch (gated by showGitIndicator),
-	// kept separate from the work dir so hiding the path does not hide the branch.
+	//   line 1 — elapsed · model · [effort ·] ctx%   (model onward: showContextIndicator)
+	//   line 2 — workspace directory                  (gated by showWorkdirIndicator)
+	//            · git branch                         (gated by showGitIndicator)
+	// The branch is kept on its own flag so hiding the path does not hide it.
 	// replyFooterEnabled is the master toggle: when false, no footer is emitted
 	// regardless of the per-line flags.
+	//
+	// showGitIndicator is atomic because /git footer flips it from a command
+	// goroutine while a turn's card is being composed on another. The other two
+	// are only written at startup and on config reload.
 	showContextIndicator bool
 	showWorkdirIndicator bool
-	showGitIndicator     bool
+	showGitIndicator     atomic.Bool
 	replyFooterEnabled   bool
 
 	// When true, /list etc. only show sessions tracked by cc-connect,
@@ -756,11 +761,12 @@ func NewEngine(name string, ag Agent, platforms []Platform, sessionStorePath str
 		maxQueuedMessages:     defaultMaxQueuedMessages,
 		showContextIndicator:  true,
 		showWorkdirIndicator:  true,
-		showGitIndicator:      true,
 		shell:                 defaultShell(),
 		shellFlag:             defaultShellFlag(),
 		pendingRestartTimeout: defaultPendingRestartTimeout,
 	}
+	// Not in the literal above: atomic.Bool has no literal form.
+	e.showGitIndicator.Store(true)
 
 	if ag != nil {
 		e.sessions.InvalidateForAgent(ag.Name())
@@ -976,10 +982,22 @@ func (e *Engine) SetShowWorkdirIndicator(show bool) {
 	e.showWorkdirIndicator = show
 }
 
-// SetShowGitIndicator controls whether the rich footer carries the branch
-// checked out in the work dir. Subordinate to SetReplyFooterEnabled.
+// SetShowGitIndicator controls whether the rich footer's second line carries
+// the branch checked out in the work dir. Subordinate to SetReplyFooterEnabled.
+// Safe to call at any time; /git footer uses it mid-session.
 func (e *Engine) SetShowGitIndicator(show bool) {
-	e.showGitIndicator = show
+	e.showGitIndicator.Store(show)
+}
+
+// gitIndicatorEnabled reports the current setting.
+func (e *Engine) gitIndicatorEnabled() bool {
+	return e.showGitIndicator.Load()
+}
+
+// SetFooterGitSaveFunc registers a callback that persists the git indicator
+// setting, so /git footer survives a restart instead of silently reverting.
+func (e *Engine) SetFooterGitSaveFunc(fn func(show bool) error) {
+	e.footerGitSaveFunc = fn
 }
 
 // SetReplyFooterEnabled is the master toggle for the per-turn reply footer.
@@ -7196,9 +7214,14 @@ func (e *Engine) buildReplyFooter(agent Agent, session AgentSession, workspaceDi
 // composeRichStatusFooter assembles the multi-line statusFooter passed to
 // RichCardSupporter.BuildRichCard. Layout (skipping any empty line):
 //
-//	line 1: ⏱ <i18n elapsed>                                  (subject to e.replyFooterEnabled)
-//	line 2: model · out N · in N cw N cr N · ctx N%           (subject to e.showContextIndicator)
-//	line 3: <workdir>                                         (subject to e.showWorkdirIndicator)
+//	line 1: ⏱ <elapsed> · <model> · <effort> · ctx N%     (model onward: e.showContextIndicator)
+//	line 2: 📁 <workdir> · ⎇ <branch>                      (e.showWorkdirIndicator / e.showGitIndicator)
+//
+// The split is by what the two lines answer. Line 1 is about the turn that just
+// ran — how long, on what model, how much budget is left. Line 2 is about where
+// it ran, which changes on a different cadence and is the part you scan for when
+// several projects share a chat. Crowding both onto one line made the workdir
+// path, the longest segment, push the context bar off the visible width.
 //
 // Returns "" when the master replyFooterEnabled toggle is off, or while the
 // turn is still streaming (footer represents finalized turn metadata —
@@ -7213,10 +7236,10 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 	}
 	lang := e.i18n.CurrentLang()
 
-	// One glanceable line: elapsed · model · effort · ctx% · workdir.
+	// Line 1 — the turn.
 	//
 	// The per-tier token breakdown (out/in/cache-write/cache-read) used to sit on
-	// a second line and was dropped: with prompt caching on, InputTokens is only
+	// its own line and was dropped: with prompt caching on, InputTokens is only
 	// the non-cached delta, so it read "新增输入 2" on every single turn and
 	// invited misreading as the total. The ctx% below carries the one thing that
 	// number was meant to convey. The legacy footer still reports the full
@@ -7238,19 +7261,24 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 		}
 	}
 
+	// Line 2 — the place.
+	var place []string
 	if e.showWorkdirIndicator {
 		if dir := replyFooterWorkDir(session, agent, workspaceDir); dir != "" {
-			head = append(head, dir)
+			place = append(place, dir)
 		}
 	}
-
-	if e.showGitIndicator {
+	if e.gitIndicatorEnabled() {
 		if branch := gitBranch(resolveFooterWorkDir(session, agent, workspaceDir)); branch != "" {
-			head = append(head, richFooterGitGlyph+" "+branch)
+			place = append(place, richFooterGitGlyph+" "+branch)
 		}
 	}
 
-	return strings.Join(head, " · ")
+	lines := []string{strings.Join(head, " · ")}
+	if len(place) > 0 {
+		lines = append(lines, strings.Join(place, " · "))
+	}
+	return strings.Join(lines, "\n")
 }
 
 const (

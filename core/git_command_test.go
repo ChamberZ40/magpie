@@ -180,3 +180,101 @@ func TestGitCommand_IsPrivileged(t *testing.T) {
 		t.Error("/git must require admin_from, like /diff")
 	}
 }
+
+// /git footer is the one subcommand that changes something, so it must not be
+// reachable through the read-only argv table.
+func TestGitFooter_IsNotAnArgvSubcommand(t *testing.T) {
+	for _, name := range gitFooterSubcommandNames {
+		if !isGitFooterSubcommand(name) {
+			t.Errorf("isGitFooterSubcommand(%q) = false", name)
+		}
+		if _, ok := lookupGitSubcommand(name); ok {
+			t.Errorf("%q resolved to an argv builder; it must be handled as a setting", name)
+		}
+	}
+}
+
+func TestParseGitFooterArg(t *testing.T) {
+	tests := []struct {
+		arg      string
+		current  bool
+		want, ok bool
+	}{
+		{"on", false, true, true},
+		{"off", true, false, true},
+		{"show", false, true, true},
+		{"hide", true, false, true},
+		{"开", false, true, true},
+		{"关", true, false, true},
+		{"ON", false, true, true},
+		{"toggle", false, true, true},
+		{"toggle", true, false, true},
+		// No argument reports the current value rather than guessing a flip.
+		{"", true, true, true},
+		{"", false, false, true},
+		{"maybe", false, false, false},
+		{"branch", false, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.arg+"/"+map[bool]string{true: "on", false: "off"}[tt.current], func(t *testing.T) {
+			got, ok := parseGitFooterArg(tt.arg, tt.current)
+			if ok != tt.ok {
+				t.Fatalf("parseGitFooterArg(%q, %v) ok = %v, want %v", tt.arg, tt.current, ok, tt.ok)
+			}
+			if ok && got != tt.want {
+				t.Errorf("parseGitFooterArg(%q, %v) = %v, want %v", tt.arg, tt.current, got, tt.want)
+			}
+		})
+	}
+}
+
+// The setting has to reach the footer, and it has to be written down — a
+// toggle that reverts on restart is worse than no toggle.
+func TestGitFooterToggle_AppliesAndPersists(t *testing.T) {
+	e := testEngineForGit(t)
+	var saved []bool
+	e.SetFooterGitSaveFunc(func(show bool) error {
+		saved = append(saved, show)
+		return nil
+	})
+	p := &stubPlatformEngine{n: "test"}
+	msg := &Message{}
+
+	e.gitFooterToggle(p, msg, "off")
+	if e.gitIndicatorEnabled() {
+		t.Error("after /git footer off, the indicator is still on")
+	}
+	e.gitFooterToggle(p, msg, "on")
+	if !e.gitIndicatorEnabled() {
+		t.Error("after /git footer on, the indicator is still off")
+	}
+	if len(saved) != 2 || saved[0] != false || saved[1] != true {
+		t.Errorf("persisted %v, want [false true]", saved)
+	}
+}
+
+// Reading the setting must not change it.
+func TestGitFooterToggle_BareArgIsReadOnly(t *testing.T) {
+	e := testEngineForGit(t)
+	e.SetShowGitIndicator(false)
+	e.gitFooterToggle(&stubPlatformEngine{n: "test"}, &Message{}, "")
+	if e.gitIndicatorEnabled() {
+		t.Error("/git footer with no argument flipped the setting")
+	}
+}
+
+// A rejected argument must leave the setting alone rather than defaulting it.
+func TestGitFooterToggle_BadArgChangesNothing(t *testing.T) {
+	e := testEngineForGit(t)
+	e.SetShowGitIndicator(true)
+	saves := 0
+	e.SetFooterGitSaveFunc(func(bool) error { saves++; return nil })
+
+	e.gitFooterToggle(&stubPlatformEngine{n: "test"}, &Message{}, "sometimes")
+	if !e.gitIndicatorEnabled() {
+		t.Error("a rejected argument turned the indicator off")
+	}
+	if saves != 0 {
+		t.Errorf("a rejected argument wrote to config %d times", saves)
+	}
+}

@@ -616,6 +616,12 @@ const (
 	MsgGitBadCount MsgKey = "git_bad_count"
 	MsgGitNoOutput MsgKey = "git_no_output"
 
+	// /git footer — the one /git subcommand that changes something.
+	MsgGitFooterUsage        MsgKey = "git_footer_usage"
+	MsgGitFooterOn           MsgKey = "git_footer_on"
+	MsgGitFooterOff          MsgKey = "git_footer_off"
+	MsgGitFooterNotPersisted MsgKey = "git_footer_not_persisted"
+
 	MsgDirChanged          MsgKey = "dir_changed"
 	MsgDirCurrent          MsgKey = "dir_current"
 	MsgDirReset            MsgKey = "dir_reset"
@@ -3820,18 +3826,18 @@ var messages = map[MsgKey]map[Language]string{
 		LangSpanish:            "Ver/configurar la consola web, arg: [status|setup]",
 	},
 	MsgBuiltinCmdGit: {
-		LangEnglish:            "Read-only git queries, arg: [status|log [n]|branch|show [ref]]",
-		LangChinese:            "只读 git 查询，参数: [status|log [n]|branch|show [ref]]",
-		LangTraditionalChinese: "唯讀 git 查詢，參數: [status|log [n]|branch|show [ref]]",
-		LangJapanese:           "読み取り専用の git 照会、引数: [status|log [n]|branch|show [ref]]",
-		LangSpanish:            "Consultas git de solo lectura, arg: [status|log [n]|branch|show [ref]]",
+		LangEnglish:            "Read-only git queries, arg: [status|log [n]|branch|show [ref]|footer on|off]",
+		LangChinese:            "只读 git 查询，参数: [status|log [n]|branch|show [ref]|footer on|off]",
+		LangTraditionalChinese: "唯讀 git 查詢，參數: [status|log [n]|branch|show [ref]|footer on|off]",
+		LangJapanese:           "読み取り専用の git 照会、引数: [status|log [n]|branch|show [ref]|footer on|off]",
+		LangSpanish:            "Consultas git de solo lectura, arg: [status|log [n]|branch|show [ref]|footer on|off]",
 	},
 	MsgGitUsage: {
-		LangEnglish:            "Usage: `/git [status | log [n] | branch | show [ref]]`\nRead-only. Use `/diff` for the working-tree diff.",
-		LangChinese:            "用法: `/git [status | log [n] | branch | show [ref]]`\n仅供查询。工作区差异请用 `/diff`。",
-		LangTraditionalChinese: "用法: `/git [status | log [n] | branch | show [ref]]`\n僅供查詢。工作區差異請用 `/diff`。",
-		LangJapanese:           "使い方: `/git [status | log [n] | branch | show [ref]]`\n読み取り専用です。作業ツリーの差分は `/diff` を使ってください。",
-		LangSpanish:            "Uso: `/git [status | log [n] | branch | show [ref]]`\nSolo lectura. Usa `/diff` para el diff del árbol de trabajo.",
+		LangEnglish:            "Usage: `/git [status | log [n] | branch | show [ref] | footer on|off]`\nRead-only. Use `/diff` for the working-tree diff.",
+		LangChinese:            "用法: `/git [status | log [n] | branch | show [ref] | footer on|off]`\n仅供查询。工作区差异请用 `/diff`。",
+		LangTraditionalChinese: "用法: `/git [status | log [n] | branch | show [ref] | footer on|off]`\n僅供查詢。工作區差異請用 `/diff`。",
+		LangJapanese:           "使い方: `/git [status | log [n] | branch | show [ref] | footer on|off]`\n読み取り専用です。作業ツリーの差分は `/diff` を使ってください。",
+		LangSpanish:            "Uso: `/git [status | log [n] | branch | show [ref] | footer on|off]`\nSolo lectura. Usa `/diff` para el diff del árbol de trabajo.",
 	},
 	MsgGitBadRef: {
 		LangEnglish:            "Not a usable git ref: `%s`",
@@ -3853,6 +3859,34 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "`git %s` 沒有輸出。",
 		LangJapanese:           "`git %s` の出力はありません。",
 		LangSpanish:            "`git %s` no produjo ninguna salida.",
+	},
+	MsgGitFooterUsage: {
+		LangEnglish:            "Usage: `/git footer [on|off]` — show or hide the branch in the reply footer.",
+		LangChinese:            "用法: `/git footer [on|off]` — 显示或隐藏回复 footer 中的分支。",
+		LangTraditionalChinese: "用法: `/git footer [on|off]` — 顯示或隱藏回覆 footer 中的分支。",
+		LangJapanese:           "使い方: `/git footer [on|off]` — 返信フッターのブランチ表示を切り替えます。",
+		LangSpanish:            "Uso: `/git footer [on|off]` — mostrar u ocultar la rama en el pie de respuesta.",
+	},
+	MsgGitFooterOn: {
+		LangEnglish:            "⎇ Branch is now shown in the reply footer.",
+		LangChinese:            "⎇ 回复 footer 现在会显示分支。",
+		LangTraditionalChinese: "⎇ 回覆 footer 現在會顯示分支。",
+		LangJapanese:           "⎇ 返信フッターにブランチを表示します。",
+		LangSpanish:            "⎇ La rama ahora aparece en el pie de respuesta.",
+	},
+	MsgGitFooterOff: {
+		LangEnglish:            "Branch is now hidden from the reply footer.",
+		LangChinese:            "回复 footer 已隐藏分支。",
+		LangTraditionalChinese: "回覆 footer 已隱藏分支。",
+		LangJapanese:           "返信フッターのブランチを非表示にしました。",
+		LangSpanish:            "La rama ya no aparece en el pie de respuesta.",
+	},
+	MsgGitFooterNotPersisted: {
+		LangEnglish:            "⚠️ Setting applied for this session, but could not be saved to config — it will revert on restart.",
+		LangChinese:            "⚠️ 本次已生效，但写入配置失败——重启后会恢复原状。",
+		LangTraditionalChinese: "⚠️ 本次已生效，但寫入設定失敗——重新啟動後會恢復原狀。",
+		LangJapanese:           "⚠️ 今回は反映しましたが、設定の保存に失敗しました。再起動すると元に戻ります。",
+		LangSpanish:            "⚠️ Aplicado en esta sesión, pero no se pudo guardar en la configuración — se revertirá al reiniciar.",
 	},
 	MsgDiffEmpty: {
 		LangEnglish:            "No diff — clean working tree (or no changes vs `%s`).",

@@ -131,12 +131,12 @@ level = "info" # debug, info, warn, error
 #                                # 在助手回复底部显示类似 Codex 的状态行（默认 true 显示）
 #                                # On rich cards the footer renders as up to two dim lines:
 #                                #   ⏱ 用时 4 分 50 秒 · 🧠 claude-opus-5 · ctx ▰▰▰▰▱▱▱▱▱▱43%
-#                                #   📁 ~/code/cc-connect · 🔧 工具 4 次 · 改动 2: engine.go, config.go
-#                                # 富卡片下 footer 渲染为最多两行小字：第 1 行耗时 + 模型与上下文
-#                                # 进度条，第 2 行工作目录 + 本轮工具次数与改动文件。模型段受
-#                                # show_context_indicator 控制，工作目录段受 show_workdir_indicator
-#                                # 控制；工具段仅在本轮调用过工具时出现。某一行的两段都为空时整行
-#                                # 省略。
+#                                #   📁 ~/code/cc-connect · ⎇ main
+#                                # 富卡片下 footer 渲染为最多两行小字：第 1 行是「这一轮做了什么」
+#                                # ——耗时、模型、上下文进度条；第 2 行是「在哪里做的」——工作目录
+#                                # 与当前 git 分支。模型及之后各段受 show_context_indicator 控制，
+#                                # 工作目录受 show_workdir_indicator 控制，分支受 show_git_indicator
+#                                # 控制。某一行的各段都为空时整行省略。
 # hide_agent_footer = false      # Strip standalone model/token footer lines emitted by agents (default: false)
 #                                # 过滤 agent 自己混入正文的模型/token 统计 footer 行（默认 false 不过滤）
 #                                # block, so agent-authored metadata (elapsed, tool counts, files touched)
@@ -746,6 +746,7 @@ name = "my-backend"
 #                                   # 隐藏工作目录当前所在的 git 分支（默认 true 显示）
 #                                   # Read from .git/HEAD; omitted when the dir is not a repository.
 #                                   # Independent of show_workdir_indicator: hiding the path keeps the branch.
+#                                   # Also switchable from chat with `/git footer on|off`, which writes back here.
 # disabled_commands = ["restart", "shell", "cron"]  # Disable specific commands for this project
 #                                                     # 禁用该项目的指定命令
 #
