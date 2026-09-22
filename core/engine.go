@@ -25,6 +25,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 const maxPlatformMessageLen = 4000
@@ -191,7 +193,7 @@ func (e *Engine) runPendingRestartNotify(req *RestartRequest, firedCh chan struc
 	defer close(firedCh)
 
 	// Recover from any panic inside dispatch (ReconstructReplyCtx / Send) so a
-	// platform-side panic cannot take down the whole cc-connect process.
+	// platform-side panic cannot take down the whole magpie process.
 	// See #1686 P1-A. Without this defer, a panic in the restart-notify
 	// goroutine kills the daemon because no higher-level recover exists.
 	defer func() {
@@ -437,7 +439,7 @@ type Engine struct {
 	showGitIndicator     atomic.Bool
 	replyFooterEnabled   bool
 
-	// When true, /list etc. only show sessions tracked by cc-connect,
+	// When true, /list etc. only show sessions tracked by magpie,
 	// hiding sessions created by direct CLI usage in the same work_dir.
 	// Default false = show all sessions.
 	filterExternalSessions bool
@@ -1026,7 +1028,7 @@ func (e *Engine) SetSkipGit(skipGit bool) {
 // prepended to each message before forwarding it to the agent. When enabled,
 // the agent receives a preamble line like:
 //
-//	[cc-connect sender_id=ou_abc123 platform=feishu]
+//	[magpie sender_id=ou_abc123 platform=feishu]
 //
 // This allows the agent to identify who sent the message and adjust behavior
 // accordingly (e.g. personal task views, role-based access control).
@@ -3719,7 +3721,7 @@ func (e *Engine) processInteractiveMessage(p Platform, msg *Message, session *Se
 // processInteractiveMessageWith is the core interactive processing loop.
 // It accepts an explicit agent, interactiveKey (for the interactiveStates map),
 // and workspaceDir so that multi-workspace mode can route to per-workspace agents.
-// ccSessionKey, when non-empty, is used for CC_SESSION_KEY in the agent env; otherwise interactiveKey is used.
+// ccSessionKey, when non-empty, is used for MAGPIE_SESSION_KEY in the agent env; otherwise interactiveKey is used.
 func (e *Engine) processInteractiveMessageWith(p Platform, msg *Message, session *Session, agent Agent, sessions *SessionManager, interactiveKey string, workspaceDir string, ccSessionKey string) {
 	// session.Unlock() is NOT deferred here — it is called explicitly in
 	// the drain loop below while holding state.mu to close the race window
@@ -3940,7 +3942,7 @@ func (e *Engine) getOrCreateWorkspaceAgent(workspace string) (Agent, *SessionMan
 	// this, per-workspace agents silently bypass the project-level
 	// run_as_user config because their opts map is freshly constructed
 	// above, not inherited from the project-level opts that main.go
-	// already decorated. See cc-connect#496 and the cc-connect/core/runas.go
+	// already decorated. See magpie#496 and the magpie/core/runas.go
 	// preamble for why run_as_user has to survive this copy.
 	if _, ok := opts["run_as_user"]; !ok {
 		if u := e.runAsUser(); u != "" {
@@ -4029,7 +4031,7 @@ func adoptPendingFromPlaceholder(existing, newState *interactiveState) {
 }
 
 // When agentOverride is non-nil it is used instead of e.agent to start the session.
-// ccSessionKey, when non-empty, is used for CC_SESSION_KEY env injection; otherwise sessionKey is used.
+// ccSessionKey, when non-empty, is used for MAGPIE_SESSION_KEY env injection; otherwise sessionKey is used.
 func (e *Engine) getOrCreateInteractiveStateWith(sessionKey string, p Platform, replyCtx any, session *Session, sessions *SessionManager, agentOverride Agent, ccSessionKey string) *interactiveState {
 	e.interactiveMu.Lock()
 	defer e.interactiveMu.Unlock()
@@ -4077,14 +4079,14 @@ func (e *Engine) getOrCreateInteractiveStateWith(sessionKey string, p Platform, 
 		ccKey = ccSessionKey
 	}
 
-	// Inject per-session env vars so the agent subprocess can call `cc-connect cron add` etc.
+	// Inject per-session env vars so the agent subprocess can call `magpie cron add` etc.
 	if inj, ok := agent.(SessionEnvInjector); ok {
-		envVars := []string{
-			"CC_PROJECT=" + e.name,
-			"CC_SESSION_KEY=" + ccKey,
-		}
+		envVars := append(
+			appid.EnvPair("PROJECT", e.name),
+			appid.EnvPair("SESSION_KEY", ccKey)...,
+		)
 		if e.dataDir != "" {
-			envVars = append(envVars, "CC_DATA_DIR="+e.dataDir)
+			envVars = append(envVars, appid.EnvPair("DATA_DIR", e.dataDir)...)
 		}
 		if exePath, err := os.Executable(); err == nil {
 			binDir := filepath.Dir(exePath)
@@ -4120,11 +4122,11 @@ func (e *Engine) getOrCreateInteractiveStateWith(sessionKey string, p Platform, 
 
 	// Restore the agent's active provider from the session before starting a
 	// new sub-process. The provider choice is persisted to disk by
-	// `/provider switch`; without restoring it here, a cc-connect process
+	// `/provider switch`; without restoring it here, a magpie process
 	// restart silently drops the user's choice while keeping the resumed
 	// agent_session_id, producing "model X does not exist" errors when
 	// the model name is sent to the wrong base_url
-	// (cc-connect internal task t-20260614-qp7xnl).
+	// (magpie internal task t-20260614-qp7xnl).
 	restoreActiveProviderFromSession(agent, session)
 
 	// Resume only when we have a concrete saved agent session ID. If the session
@@ -4133,7 +4135,7 @@ func (e *Engine) getOrCreateInteractiveStateWith(sessionKey string, p Platform, 
 	startSessionID := session.GetAgentSessionID()
 	// Cross-project session leakage guard (issue #599): if a session ID was
 	// inherited from a different project's workspace (e.g. another
-	// cc-connect project that happens to share a Session row), the agent
+	// magpie project that happens to share a Session row), the agent
 	// can detect the mismatch and we should clear the ID rather than
 	// resume a conversation that has nothing to do with this project.
 	if startSessionID != "" {
@@ -6637,7 +6639,7 @@ func (e *Engine) handleCommand(p Platform, msg *Message, raw string) bool {
 			e.executeSkill(p, msg, skill, args)
 			return true
 		}
-		// Not a cc-connect command — notify user, then fall through to agent
+		// Not a magpie command — notify user, then fall through to agent
 		e.send(p, msg.ReplyCtx, fmt.Sprintf(e.i18n.T(MsgUnknownCommand), "/"+cmd))
 		return false
 	}
@@ -6914,7 +6916,7 @@ func (e *Engine) cmdNew(p Platform, msg *Message, args []string) {
 
 // applySessionFilter conditionally filters agent sessions based on the
 // filter_external_sessions config. When disabled (default), all sessions are
-// returned. When enabled, only sessions tracked by cc-connect are shown.
+// returned. When enabled, only sessions tracked by magpie are shown.
 func (e *Engine) applySessionFilter(sessions []AgentSessionInfo, sm *SessionManager) []AgentSessionInfo {
 	if !e.filterExternalSessions {
 		return sessions
@@ -6922,7 +6924,7 @@ func (e *Engine) applySessionFilter(sessions []AgentSessionInfo, sm *SessionMana
 	return filterOwnedSessions(sessions, sm.KnownAgentSessionIDs())
 }
 
-// filterOwnedSessions removes agent sessions that are not tracked by cc-connect's
+// filterOwnedSessions removes agent sessions that are not tracked by magpie's
 // session manager. This prevents external CLI sessions in the same work_dir from
 // appearing in /list, /switch, /delete, etc. If the session manager has no tracked
 // agent sessions at all (e.g. first run), all sessions are returned unfiltered.
@@ -10899,10 +10901,10 @@ func (e *Engine) switchProvider(p Platform, msg *Message, sessions *SessionManag
 	s.SetAgentSessionID("", "")
 	s.ClearHistory()
 	// Persist the provider choice so that a subsequent --resume after a
-	// cc-connect process restart can re-bind the agent's activeIdx; without
+	// magpie process restart can re-bind the agent's activeIdx; without
 	// this the agent reverts to its default provider while the saved
 	// agent_session_id keeps the conversation going, producing "model X
-	// does not exist" errors against the wrong base_url. See cc-connect
+	// does not exist" errors against the wrong base_url. See magpie
 	// internal task t-20260614-qp7xnl.
 	s.SetActiveProvider(name)
 	sessions.Save()
@@ -11463,7 +11465,7 @@ func normalizeSendWorkDir(workDir, base string) (string, error) {
 }
 
 // SendTTSToSession synthesizes and sends a voice message to an active session.
-// It is used by the local API/CLI so agents can call `cc-connect send --tts`.
+// It is used by the local API/CLI so agents can call `magpie send --tts`.
 func (e *Engine) SendTTSToSession(sessionKey, text string) error {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -11479,7 +11481,7 @@ func (e *Engine) SendTTSToSession(sessionKey, text string) error {
 // SendAudiosToSession routes outbound audio attachments to the
 // platform's AudioSender (native voice bubble + transcoding) when
 // supported, falling back to FileSender otherwise. Used by
-// `cc-connect send --audio`. Mirrors SendToSessionWithAttachments for
+// `magpie send --audio`. Mirrors SendToSessionWithAttachments for
 // audio-typed clips so they don't get dispatched as generic files.
 func (e *Engine) SendAudiosToSession(sessionKey string, audios []FileAttachment) error {
 	if len(audios) == 0 {
@@ -11524,7 +11526,7 @@ func (e *Engine) SendAudiosToSession(sessionKey string, audios []FileAttachment)
 
 // SendVideosToSession routes outbound video attachments to the
 // platform's VideoSender (native video bubble) when supported, falling
-// back to FileSender otherwise. Used by `cc-connect send --video`.
+// back to FileSender otherwise. Used by `magpie send --video`.
 func (e *Engine) SendVideosToSession(sessionKey string, videos []FileAttachment) error {
 	if len(videos) == 0 {
 		return nil
@@ -15799,10 +15801,10 @@ func (e *Engine) HandleRelay(ctx context.Context, fromProject, sourceSessionKey,
 	session := sessions.GetOrCreateActive(relaySessionKey)
 
 	if inj, ok := agent.(SessionEnvInjector); ok {
-		envVars := []string{
-			"CC_PROJECT=" + e.name,
-			"CC_SESSION_KEY=" + sourceSessionKey,
-		}
+		envVars := append(
+			appid.EnvPair("PROJECT", e.name),
+			appid.EnvPair("SESSION_KEY", sourceSessionKey)...,
+		)
 		if exePath, err := os.Executable(); err == nil {
 			binDir := filepath.Dir(exePath)
 			if curPath := os.Getenv("PATH"); curPath != "" {
@@ -16110,7 +16112,7 @@ func (e *Engine) cmdBindStatus(p Platform, replyCtx any, chatID string) {
 	e.reply(p, replyCtx, fmt.Sprintf(e.i18n.T(MsgRelayBound), strings.Join(parts, " ↔ ")))
 }
 
-const ccConnectInstructionMarker = "<!-- cc-connect-instructions -->"
+const ccConnectInstructionMarker = "<!-- magpie-instructions -->"
 
 type setupResult int
 
@@ -16202,9 +16204,9 @@ func (e *Engine) buildSenderPrompt(content, userID, userName, platform, sessionK
 	}
 	if userName != "" {
 		safeName := strings.NewReplacer(`"`, `'`, "\n", " ", "\r", "").Replace(userName)
-		return fmt.Sprintf("[cc-connect sender_id=%s sender_name=\"%s\" platform=%s chat_id=%s]\n%s", userID, safeName, platform, chatID, content)
+		return fmt.Sprintf("[magpie sender_id=%s sender_name=\"%s\" platform=%s chat_id=%s]\n%s", userID, safeName, platform, chatID, content)
 	}
-	return fmt.Sprintf("[cc-connect sender_id=%s platform=%s chat_id=%s]\n%s", userID, platform, chatID, content)
+	return fmt.Sprintf("[magpie sender_id=%s platform=%s chat_id=%s]\n%s", userID, platform, chatID, content)
 }
 
 func extractChannelID(sessionKey string) string {
@@ -17041,7 +17043,7 @@ func (e *Engine) cmdWebStatus(p Platform, msg *Message) {
 
 // restoreActiveProviderFromSession syncs the agent's active provider to the
 // one persisted in the session, but only when the choice survived a
-// cc-connect process restart (i.e. the in-memory active provider is not
+// magpie process restart (i.e. the in-memory active provider is not
 // already the desired one). It is a no-op when:
 //   - the agent does not implement ProviderSwitcher,
 //   - the session never recorded a provider choice (`/provider switch` was

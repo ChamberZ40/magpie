@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -8,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/ChamberZ40/magpie/power"
 )
 
 func TestConfigValidate(t *testing.T) {
@@ -577,7 +580,7 @@ func TestLoad_DefaultsDataDir(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	want := filepath.Join(dir, ".cc-connect")
+	want := filepath.Join(dir, ".magpie")
 	if cfg.DataDir != want {
 		t.Fatalf("Load() data_dir = %q, want %q", cfg.DataDir, want)
 	}
@@ -2010,6 +2013,82 @@ func TestLoadRejectsInvalidRelayVisibility(t *testing.T) {
 		t.Fatalf("error = %q, want relay.visibility validation error", err.Error())
 	}
 }
+
+const powerConfigFixture = `
+[power]
+prevent_sleep = "%s"
+
+[[projects]]
+name = "alpha"
+
+[projects.agent]
+type = "codex"
+
+[projects.agent.options]
+work_dir = "/tmp/alpha"
+
+[[projects.platforms]]
+type = "telegram"
+
+[projects.platforms.options]
+bot_token = "token_xxx"
+`
+
+func TestLoadPreventSleep(t *testing.T) {
+	tests := []struct {
+		value   string
+		wantErr bool
+	}{
+		{"off", false},
+		{"always", false},
+		{"ac_only", false},
+		// A plausible-looking but unsupported value has to fail loudly: a
+		// silently ignored one leaves the host asleep with no explanation.
+		{"yes", true},
+		{"ac-only", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			configPath := writeConfigFixture(t, fmt.Sprintf(powerConfigFixture, tt.value))
+
+			cfg, err := Load(configPath)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("prevent_sleep = %q loaded without error", tt.value)
+				}
+				if !strings.Contains(err.Error(), `power.prevent_sleep must be "off", "always", or "ac_only"`) {
+					t.Fatalf("error = %q, want power.prevent_sleep validation error", err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.Power.PreventSleep != tt.value {
+				t.Fatalf("cfg.Power.PreventSleep = %q, want %q", cfg.Power.PreventSleep, tt.value)
+			}
+		})
+	}
+}
+
+// An omitted [power] block must load and mean off, so existing configs keep
+// working unchanged.
+func TestLoadPreventSleepDefaultsToOff(t *testing.T) {
+	configPath := writeConfigFixture(t, relayConfigFixture)
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Power.PreventSleep != "" {
+		t.Fatalf("cfg.Power.PreventSleep = %q, want empty", cfg.Power.PreventSleep)
+	}
+	if got, err := power.ParseMode(cfg.Power.PreventSleep); err != nil || got != power.ModeOff {
+		t.Fatalf("ParseMode(%q) = %q, %v; want off, nil", cfg.Power.PreventSleep, got, err)
+	}
+}
+
 func writeConfigFixture(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()

@@ -106,7 +106,7 @@ func gitLogCount(e *Engine, arg string) (int, error) {
 // isSafeGitRef reports whether ref is plausible as a revision and cannot be
 // mistaken for an option. The charset covers branches, tags, abbreviated shas,
 // and the usual suffixes (HEAD~3, HEAD@{2}, main^2). '+' is in there because
-// real tags use it — this repository's own version is v1.5.0+trim.1.
+// real tags use it for SemVer build metadata (v1.0.0+deadbeef).
 func isSafeGitRef(ref string) bool {
 	if ref == "" || len(ref) > gitRefMaxLen || strings.HasPrefix(ref, "-") {
 		return false

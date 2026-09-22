@@ -5,7 +5,7 @@ package core
 // runas_audit.go — isolation leak-audit probe for the run_as_user sandbox.
 //
 // The preflight gates in runas_check.go answer the question "can
-// cc-connect spawn as the target user without errors?". This file
+// magpie spawn as the target user without errors?". This file
 // answers the stronger question: "once the target user IS spawned, can
 // it still read things it shouldn't be able to?".
 //
@@ -77,12 +77,12 @@ func ProbeScript() []byte { return runasProbeScript }
 
 // IsolationReport is the structured result of running the probe.
 type IsolationReport struct {
-	Project       string            `json:"project"`
-	RunAsUser     string            `json:"run_as_user"`
-	WorkDir       string            `json:"work_dir"`
-	Timestamp     time.Time         `json:"timestamp"`
-	Identity      IdentitySnapshot  `json:"identity"`
-	WorkDirStatus WorkDirStatus     `json:"work_dir_status"`
+	Project       string           `json:"project"`
+	RunAsUser     string           `json:"run_as_user"`
+	WorkDir       string           `json:"work_dir"`
+	Timestamp     time.Time        `json:"timestamp"`
+	Identity      IdentitySnapshot `json:"identity"`
+	WorkDirStatus WorkDirStatus    `json:"work_dir_status"`
 	// TargetPaths lists existence results for files the target user is
 	// supposed to have in their own home. Missing is informational —
 	// runtime tools will fail, but it's an operator migration gap, not
@@ -186,7 +186,7 @@ func RunIsolationProbe(ctx context.Context, cfg AuditConfig) (IsolationReport, e
 	// script body. Values are pre-validated at config parse time so
 	// shell-quoting concerns are limited, but we still quote everything.
 	header := fmt.Sprintf(
-		"export CC_PROBE_WORKDIR=%s\nexport CC_PROBE_OTHER_USERS=%s\nexport CC_PROBE_SUPERVISOR=%s\n",
+		"export MAGPIE_PROBE_WORKDIR=%s\nexport MAGPIE_PROBE_OTHER_USERS=%s\nexport MAGPIE_PROBE_SUPERVISOR=%s\n",
 		shellQuote(cfg.WorkDir),
 		shellQuote(strings.Join(filterOtherUsers(cfg.OtherUsers, cfg.RunAsUser), " ")),
 		shellQuote(cfg.Supervisor),

@@ -130,7 +130,7 @@ func TestRichFooter_GitBranchUsesRawPathNotCompacted(t *testing.T) {
 	if err != nil || home == "" {
 		t.Skip("no home directory to compact against")
 	}
-	dir, err := os.MkdirTemp(home, "cc-connect-git-footer-")
+	dir, err := os.MkdirTemp(home, "magpie-git-footer-")
 	if err != nil {
 		t.Skipf("cannot create a repo under home: %v", err)
 	}

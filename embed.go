@@ -1,4 +1,4 @@
-package ccconnect
+package magpie
 
 import _ "embed"
 

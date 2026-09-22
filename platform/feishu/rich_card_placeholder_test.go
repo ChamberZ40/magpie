@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 // A turn with no tool calls and no thinking events used to synthesize an empty

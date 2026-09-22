@@ -1,10 +1,10 @@
-// Package mocks provides mock implementations for testing cc-connect components.
+// Package mocks provides mock implementations for testing magpie components.
 package mocks
 
 import (
 	"context"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 	"github.com/stretchr/testify/mock"
 )
 

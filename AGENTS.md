@@ -1,14 +1,14 @@
-# CC-Connect Development Guide
+# Magpie Development Guide
 
 ## Project Overview
 
-CC-Connect is a bridge that connects AI coding agents (Claude Code, Codex, Cursor, GitHub Copilot, any ACP-speaking agent) with messaging platforms (Feishu/Lark, WeChat Work, WeChat). Users interact with their coding agent through their preferred messaging app.
+Magpie is a bridge that connects AI coding agents (Claude Code, Codex, Cursor, GitHub Copilot, any ACP-speaking agent) with messaging platforms (Feishu/Lark, WeChat Work, WeChat). Users interact with their coding agent through their preferred messaging app.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                   cmd/cc-connect                │  ← entry point, CLI, daemon
+│                   cmd/magpie                │  ← entry point, CLI, daemon
 ├─────────────────────────────────────────────────┤
 │                     config/                     │  ← TOML config parsing
 ├─────────────────────────────────────────────────┤
@@ -192,7 +192,7 @@ A CUJ test is a USER-perspective end-to-end scenario, not a developer-
 perspective unit test. The current inventory of CUJs and their coverage
 status lives in:
 
-`projects/cc-connect/agents/qa-cursor/release-gate/CUJ-INVENTORY.md`
+`projects/magpie/agents/qa-cursor/release-gate/CUJ-INVENTORY.md`
 (in the spaceship agency workspace; the registered authoritative copy).
 
 Rules for adding/updating CUJ tests in `core/cuj_test.go`:
@@ -232,7 +232,7 @@ make build EXCLUDE=weixin,wecom
 ### Direct build tag usage (without Make)
 
 ```bash
-go build -tags 'no_weixin no_wecom' ./cmd/cc-connect
+go build -tags 'no_weixin no_wecom' ./cmd/magpie
 ```
 
 Available tags: `no_acp`, `no_claudecode`, `no_codex`, `no_copilot`, `no_cursor`,
@@ -253,7 +253,7 @@ Available tags: `no_acp`, `no_claudecode`, `no_codex`, `no_copilot`, `no_cursor`
 1. Create `platform/newplatform/newplatform.go`
 2. Implement `core.Platform` interface (and optional interfaces as needed)
 3. Register in `init()`: `core.RegisterPlatform("newplatform", factory)`
-4. Create `cmd/cc-connect/plugin_platform_newplatform.go` with `//go:build !no_newplatform` tag
+4. Create `cmd/magpie/plugin_platform_newplatform.go` with `//go:build !no_newplatform` tag
 5. Add `newplatform` to `ALL_PLATFORMS` in `Makefile`
 6. Add config example in `config.example.toml`
 7. Add unit tests
@@ -263,8 +263,8 @@ Available tags: `no_acp`, `no_claudecode`, `no_codex`, `no_copilot`, `no_cursor`
 1. Create `agent/newagent/newagent.go`
 2. Implement `core.Agent` and `core.AgentSession` interfaces
 3. Register in `init()`: `core.RegisterAgent("newagent", factory)`
-4. Create `cmd/cc-connect/plugin_agent_newagent.go` with `//go:build !no_newagent` tag
+4. Create `cmd/magpie/plugin_agent_newagent.go` with `//go:build !no_newagent` tag
 5. Add `newagent` to `ALL_AGENTS` in `Makefile`
-6. Optionally implement `AgentDoctorInfo` for `cc-connect doctor` support
+6. Optionally implement `AgentDoctorInfo` for `magpie doctor` support
 7. Add config example in `config.example.toml`
 8. Add unit tests

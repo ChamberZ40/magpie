@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 func TestAppServerSession_ApplyThreadRuntimeState(t *testing.T) {

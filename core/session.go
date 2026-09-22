@@ -18,14 +18,14 @@ const ContinueSession = "__continue__"
 
 // Session tracks one conversation between a user and the agent.
 type Session struct {
-	ID                  string         `json:"id"`
-	Name                string         `json:"name"`
-	AgentSessionID      string         `json:"agent_session_id"`
-	AgentType           string         `json:"agent_type,omitempty"`
-	PastAgentSessionIDs []string       `json:"past_agent_session_ids,omitempty"`
+	ID                  string   `json:"id"`
+	Name                string   `json:"name"`
+	AgentSessionID      string   `json:"agent_session_id"`
+	AgentType           string   `json:"agent_type,omitempty"`
+	PastAgentSessionIDs []string `json:"past_agent_session_ids,omitempty"`
 	// ActiveProvider is the agent provider name that was active when this
 	// session last took a turn. It is restored before --resume so that a
-	// cc-connect process restart does not silently drop a user's
+	// magpie process restart does not silently drop a user's
 	// `/provider switch` (the agent_session_id survives on disk while the
 	// in-memory active provider does not). Empty means "no explicit choice
 	// — use whatever the agent's default is".
@@ -505,9 +505,9 @@ func (sm *SessionManager) AllSessions() []*Session {
 	return out
 }
 
-// KnownAgentSessionIDs returns the set of agent session IDs tracked by cc-connect.
+// KnownAgentSessionIDs returns the set of agent session IDs tracked by magpie.
 // This is used to filter agent.ListSessions() output to only sessions owned by
-// cc-connect, excluding sessions created by external CLI usage in the same work_dir.
+// magpie, excluding sessions created by external CLI usage in the same work_dir.
 // It includes both current and historical agent session IDs so that sessions whose
 // IDs were cleared (e.g. after /new or provider switch) remain visible.
 //
@@ -828,7 +828,7 @@ func (sm *SessionManager) PruneDuplicateSessions(mergeHistory bool) PruneResult 
 	defer sm.mu.Unlock()
 
 	// Group sessions by baseChat
-	chatSessions := make(map[string][]*Session) // baseChat -> sessions
+	chatSessions := make(map[string][]*Session)  // baseChat -> sessions
 	sessionToBaseChat := make(map[string]string) // session.ID -> baseChat
 
 	for userKey, sessionIDs := range sm.userSessions {

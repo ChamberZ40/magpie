@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 // mapSessionUpdate turns one ACP session/update payload into zero or more core events.

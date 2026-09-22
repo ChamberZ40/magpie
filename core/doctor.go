@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 type DoctorStatus int
@@ -379,7 +380,7 @@ func checkNetwork(ctx context.Context) []DoctorCheckResult {
 	}
 
 	// Check config file
-	if cfgPath := os.Getenv("CC_CONFIG_PATH"); cfgPath != "" {
+	if cfgPath := appid.Getenv("CONFIG_PATH"); cfgPath != "" {
 		if _, err := os.Stat(cfgPath); err != nil {
 			results = append(results, DoctorCheckResult{
 				Name:   "Config File",
@@ -389,9 +390,12 @@ func checkNetwork(ctx context.Context) []DoctorCheckResult {
 		}
 	}
 
-	// Check data directory
-	if home, err := os.UserHomeDir(); err == nil {
-		dataDir := filepath.Join(home, ".cc-connect")
+	// Check data directory.
+	//
+	// NOTE: this assumes the default location. A deployment that sets data_dir
+	// in config.toml will be warned about a directory it does not use; fixing
+	// that means threading the resolved data dir down from the engine.
+	if dataDir, err := appid.HomeDir(); err == nil {
 		if info, err := os.Stat(dataDir); err != nil {
 			results = append(results, DoctorCheckResult{
 				Name:   "Data Directory",

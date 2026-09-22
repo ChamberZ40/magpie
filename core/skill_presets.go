@@ -13,8 +13,8 @@ import (
 const (
 	// Served from this fork for the same reason as the provider presets: a
 	// runtime fetch from upstream makes the local file decorative.
-	defaultSkillPresetsURL          = "https://raw.githubusercontent.com/ChamberZ40/Mac-connect/main/skill-presets.json"
-	fallbackSkillPresetsURL         = "https://cdn.jsdelivr.net/gh/ChamberZ40/Mac-connect@main/skill-presets.json"
+	defaultSkillPresetsURL          = "https://raw.githubusercontent.com/ChamberZ40/magpie/main/skill-presets.json"
+	fallbackSkillPresetsURL         = "https://cdn.jsdelivr.net/gh/ChamberZ40/magpie@main/skill-presets.json"
 	skillPresetsCacheTTL            = 6 * time.Hour
 	skillPresetsHTTPTimeout         = 15 * time.Second
 	skillPresetsFallbackHTTPTimeout = 10 * time.Second
@@ -38,16 +38,16 @@ type SkillPreset struct {
 
 // SkillSource describes where the skill is hosted / provided from.
 type SkillSource struct {
-	Provider string `json:"provider"`           // e.g. "github", "skills.sh", "npm"
-	Name     string `json:"name,omitempty"`      // display name, e.g. "GitHub", "Skills.sh"
-	URL      string `json:"url,omitempty"`        // provider home page
+	Provider string `json:"provider"`       // e.g. "github", "skills.sh", "npm"
+	Name     string `json:"name,omitempty"` // display name, e.g. "GitHub", "Skills.sh"
+	URL      string `json:"url,omitempty"`  // provider home page
 }
 
 // SkillPricing describes the pricing model for a skill.
 type SkillPricing struct {
 	Type     string  `json:"type"`               // "free", "paid", "freemium"
-	Price    float64 `json:"price,omitempty"`     // 0 for free
-	Currency string  `json:"currency,omitempty"`  // "USD", "CNY", etc.
+	Price    float64 `json:"price,omitempty"`    // 0 for free
+	Currency string  `json:"currency,omitempty"` // "USD", "CNY", etc.
 }
 
 // SkillPresetsResponse is the top-level JSON schema for remote skill presets.

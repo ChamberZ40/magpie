@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 func TestMapSessionUpdate_agentMessageChunk(t *testing.T) {

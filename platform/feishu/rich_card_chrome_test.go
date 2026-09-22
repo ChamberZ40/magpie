@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 // TestBuildRichCard_HeaderIsStableAcrossBuilds guards the root cause of the old
@@ -105,7 +105,7 @@ func TestBuildRichCard_PanelTitleLocalization(t *testing.T) {
 // TestBuildRichCard_FooterIsOneNotationBlock covers the rich-card footer, which
 // had no coverage at all before (every existing test passed statusFooter="").
 func TestBuildRichCard_FooterIsOneNotationBlock(t *testing.T) {
-	footer := "⏱ 2.4s\nclaude-opus-5 · ctx 4%\n~/code/cc-connect"
+	footer := "⏱ 2.4s\nclaude-opus-5 · ctx 4%\n~/code/magpie"
 	elements := cardBodyElements(t, buildRichCard(core.CardStatusDone, "en", nil, "answer", false, footer))
 
 	if len(elements) < 2 {
@@ -123,7 +123,7 @@ func TestBuildRichCard_FooterIsOneNotationBlock(t *testing.T) {
 		t.Errorf("footer text_size = %v, want notation", last["text_size"])
 	}
 	content, _ := last["content"].(string)
-	for _, want := range []string{"⏱ 2.4s", "claude-opus-5 · ctx 4%", "~/code/cc-connect"} {
+	for _, want := range []string{"⏱ 2.4s", "claude-opus-5 · ctx 4%", "~/code/magpie"} {
 		if !strings.Contains(content, want) {
 			t.Errorf("footer content %q missing %q", content, want)
 		}

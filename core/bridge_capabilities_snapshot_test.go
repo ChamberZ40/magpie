@@ -26,8 +26,8 @@ func TestBridgeBuildCapabilitiesSnapshotIncludesProjectCatalog(t *testing.T) {
 	if snapshot.Version != 1 {
 		t.Fatalf("version = %d, want 1", snapshot.Version)
 	}
-	if snapshot.Host.CCConnectVersion != "v9.9.9" {
-		t.Fatalf("cc_connect_version = %q, want %q", snapshot.Host.CCConnectVersion, "v9.9.9")
+	if snapshot.Host.MagpieVersion != "v9.9.9" {
+		t.Fatalf("magpie_version = %q, want %q", snapshot.Host.MagpieVersion, "v9.9.9")
 	}
 	if snapshot.Host.Commit != "abc123" {
 		t.Fatalf("commit = %q, want %q", snapshot.Host.Commit, "abc123")

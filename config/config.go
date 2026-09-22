@@ -14,6 +14,9 @@ import (
 	"sync"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/ChamberZ40/magpie/appid"
+	"github.com/ChamberZ40/magpie/power"
 )
 
 // validRunAsUserName is the portable-username character set plus digits.
@@ -84,7 +87,7 @@ var configMu sync.Mutex
 var ConfigPath string
 
 type Config struct {
-	DataDir        string `toml:"data_dir"` // session store directory, default ~/.cc-connect
+	DataDir        string `toml:"data_dir"` // session store directory, default ~/.magpie
 	AttachmentSend string `toml:"attachment_send"`
 	// Quiet is legacy: when true and [display] does not set thinking_messages / tool_messages,
 	// engines behave as if those flags were false. Per-project quiet overrides when set.
@@ -110,6 +113,7 @@ type Config struct {
 	Webhook            WebhookConfig           `toml:"webhook"`
 	Bridge             BridgeConfig            `toml:"bridge"`
 	Management         ManagementConfig        `toml:"management"`
+	Power              PowerConfig             `toml:"power"` // keep the host awake while the bridge runs
 	Hooks              []HookConfig            `toml:"hooks"`
 	IdleTimeoutMins    *int                    `toml:"idle_timeout_mins,omitempty"`  // max minutes between consecutive agent events; 0 = no timeout; default 120
 	MaxTurnTimeMins    *int                    `toml:"max_turn_time_mins,omitempty"` // absolute wall-clock cap per turn in minutes; 0 = disabled (default)
@@ -129,11 +133,22 @@ type Config struct {
 	// available. Example: "source ~/.zshrc"
 	ShellProfile string `toml:"shell_profile,omitempty"`
 	// MaxAttachmentSizeMB is the per-file size limit, in MiB, for attachments
-	// sent through `cc-connect send --file/--image/--audio/--video` and the
+	// sent through `magpie send --file/--image/--audio/--video` and the
 	// /send API. 0 (the default) means use core.DefaultMaxAttachmentSize
 	// (50 MiB). Raise it to send larger files; the request body limit on the
 	// API side scales with this value to account for base64 expansion.
 	MaxAttachmentSizeMB int `toml:"max_attachment_size_mb,omitempty"`
+}
+
+// PowerConfig controls whether the process keeps the host awake while it runs.
+//
+// A sleeping host means a dropped platform connection and undelivered
+// messages, which on a laptop with the stock settings happens within minutes of
+// the user walking away. Only macOS implements this today; elsewhere a non-off
+// value is logged and ignored. Changing it takes effect on restart.
+type PowerConfig struct {
+	// PreventSleep is "off" (default), "always", or "ac_only".
+	PreventSleep string `toml:"prevent_sleep,omitempty"`
 }
 
 // CronConfig controls cron job behavior.
@@ -320,7 +335,7 @@ type TTSConfig struct {
 }
 
 // TTSAgentConfig overrides global [tts] synthesis parameters for one project.
-// Keys are project names, which map naturally to cc-connect's agent workspaces
+// Keys are project names, which map naturally to magpie's agent workspaces
 // (for example assistant, reviewer).
 type TTSAgentConfig struct {
 	Provider     string  `toml:"provider,omitempty"`
@@ -482,7 +497,7 @@ type ProjectConfig struct {
 	Platforms                    []PlatformConfig   `toml:"platforms"`
 	Heartbeat                    HeartbeatConfig    `toml:"heartbeat"`
 	AutoCompress                 AutoCompressConfig `toml:"auto_compress"`
-	// ResetOnIdleMins automatically rotates to a new cc-connect session after
+	// ResetOnIdleMins automatically rotates to a new magpie session after
 	// the current session has been inactive for the specified number of minutes.
 	// 0 or nil disables the behavior.
 	ResetOnIdleMins *int `toml:"reset_on_idle_mins,omitempty"`
@@ -492,7 +507,7 @@ type ProjectConfig struct {
 	// RunAsUser, when set, causes the agent command for this project to be
 	// spawned under a different Unix user via `sudo -n -iu <user> --`. This
 	// provides OS-level file-system isolation from the supervisor user who
-	// runs cc-connect itself. Requires passwordless sudo to the target user
+	// runs magpie itself. Requires passwordless sudo to the target user
 	// and is POSIX-only. See docs/usage.md "Running agents as a different
 	// Unix user" for setup and migration.
 	RunAsUser string `toml:"run_as_user,omitempty"`
@@ -550,7 +565,7 @@ type ProjectConfig struct {
 	Observe    *ObserveConfig  `toml:"observe,omitempty"`
 	References ReferenceConfig `toml:"references,omitempty"`
 	// FilterExternalSessions: when true, /list only shows sessions created by
-	// cc-connect, hiding sessions created by direct CLI usage in the same work_dir.
+	// magpie, hiding sessions created by direct CLI usage in the same work_dir.
 	// Default is false (show all sessions).
 	FilterExternalSessions *bool `toml:"filter_external_sessions,omitempty"`
 	// Shell overrides the global shell for this project. See Config.Shell.
@@ -633,10 +648,10 @@ func load(path string) (*Config, error) {
 	}
 	resolveEnvInConfig(cfg)
 	if cfg.DataDir == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			cfg.DataDir = filepath.Join(home, ".cc-connect")
+		if dir, err := appid.HomeDir(); err == nil {
+			cfg.DataDir = dir
 		} else {
-			cfg.DataDir = ".cc-connect"
+			cfg.DataDir = appid.DirIn(".")
 		}
 	}
 	cfg.AttachmentSend = strings.ToLower(strings.TrimSpace(cfg.AttachmentSend))
@@ -649,7 +664,7 @@ func load(path string) (*Config, error) {
 
 // LoadPermissive loads the config file and performs all validation except the
 // "at least one platform per project" check. Use this for commands (like
-// `cc-connect web`) that should work even before platforms are configured.
+// `magpie web`) that should work even before platforms are configured.
 func LoadPermissive(path string) (*Config, error) {
 	cfg, err := load(path)
 	if err != nil {
@@ -998,7 +1013,7 @@ func EffectiveCardMode(cfg *Config, proj *ProjectConfig) string {
 }
 
 // validatePermissive is like validate but skips the "at least one platform"
-// requirement so that commands like `cc-connect web` can operate on agent-only
+// requirement so that commands like `magpie web` can operate on agent-only
 // configs before platforms have been set up.
 func (c *Config) validatePermissive() error {
 	return c.validateInternal(true)
@@ -1019,6 +1034,9 @@ func (c *Config) validateInternal(permissive bool) error {
 	}
 	if c.Relay.TimeoutSecs != nil && *c.Relay.TimeoutSecs < 0 {
 		return fmt.Errorf("config: relay.timeout_secs must be >= 0")
+	}
+	if _, err := power.ParseMode(c.Power.PreventSleep); err != nil {
+		return fmt.Errorf("config: power.prevent_sleep must be \"off\", \"always\", or \"ac_only\"")
 	}
 	switch strings.ToLower(strings.TrimSpace(c.Relay.Visibility)) {
 	case "", "full", "summary", "none":

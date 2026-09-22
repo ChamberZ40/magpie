@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 // UnauthorizedAccessMessage is safe to show to an inbound sender when the
@@ -34,27 +36,29 @@ func MergeEnv(base, extra []string) []string {
 	return append(merged, extra...)
 }
 
-// InjectedAgentEnv returns the env vars cc-connect injects into a spawned
-// agent process so in-process extensions can learn cc-connect's runtime state.
-// The CC_ prefix marks these vars as cc-connect's public extension contract,
-// alongside CC_PROJECT / CC_SESSION_KEY / CC_DATA_DIR that the engine injects
+// InjectedAgentEnv returns the env vars magpie injects into a spawned agent
+// process so in-process extensions can learn magpie's runtime state, alongside
+// the MAGPIE_PROJECT / MAGPIE_SESSION_KEY / MAGPIE_DATA_DIR the engine injects
 // as session env.
 //
 // Currently only the permission mode is exposed:
 //
-//	CC_PERMISSION_MODE — the session's permission mode ("default" | "yolo").
+//	MAGPIE_PERMISSION_MODE — the session's permission mode ("default" | "yolo").
 //	    Extensions such as the pi permission-gate read it to auto-approve tool
 //	    calls in yolo mode. An empty mode returns nil, so non-yolo sessions see
 //	    no injected var.
 //
+// This is a public extension contract, so each var is also exported under its
+// pre-rename CC_ name for extensions that have not been updated yet.
+//
 // Kept as a single core helper so every agent opts into the same convention
-// instead of hardcoding the variable name; extending the contract (e.g.
-// CC_MODEL, CC_THINKING) only means extending this function.
+// instead of hardcoding the variable name; extending the contract (e.g. a model
+// or thinking-level var) only means extending this function.
 func InjectedAgentEnv(mode string) []string {
 	if mode == "" {
 		return nil
 	}
-	return []string{"CC_PERMISSION_MODE=" + mode}
+	return appid.EnvPair("PERMISSION_MODE", mode)
 }
 
 // CheckAllowFrom logs a security warning at startup when allow_from is not
@@ -112,8 +116,8 @@ type FileAttachment struct {
 //
 // Layout:
 //
-//	messageID == "": <workDir>/.cc-connect/attachments/<sanitized_name>
-//	messageID != "": <workDir>/.cc-connect/attachments/<messageID>/<sanitized_name>
+//	messageID == "": <workDir>/.magpie/attachments/<sanitized_name>
+//	messageID != "": <workDir>/.magpie/attachments/<messageID>/<sanitized_name>
 //
 // Scoping files to a per-message subdirectory (issue #1552) prevents the
 // silent-overwrite data loss that occurred when two different messages
@@ -127,7 +131,7 @@ type FileAttachment struct {
 //
 // workDir may be absolute or relative; the returned paths are always
 // absolute. When workDir is relative, filepath.Abs resolves it against
-// the cc-connect process's current working directory, so callers running
+// the magpie process's current working directory, so callers running
 // from different cwd contexts (especially those where the agent's
 // "workDir" is itself relative to the user's home, like "~/project") still
 // get paths the agent can actually open. An empty workDir falls back to
@@ -160,9 +164,9 @@ func SaveFilesToDisk(workDir, messageID string, files []FileAttachment) []string
 	}
 	// Absolutize workDir so the returned paths are usable no matter where the
 	// process is invoked from. See issue #1459: when workDir is relative
-	// (e.g. ".cc-connect" or "project/sub"), the agent's prompt referenced
-	// ".cc-connect/attachments/<file>" while the file actually landed at
-	// workDir/.cc-connect/attachments/<file> — a path mismatch that lost
+	// (e.g. ".magpie" or "project/sub"), the agent's prompt referenced
+	// ".magpie/attachments/<file>" while the file actually landed at
+	// workDir/.magpie/attachments/<file> — a path mismatch that lost
 	// every attachment.
 	absWorkDir, err := filepath.Abs(workDir)
 	if err != nil {
@@ -172,7 +176,7 @@ func SaveFilesToDisk(workDir, messageID string, files []FileAttachment) []string
 		absWorkDir = workDir
 		slog.Warn("SaveFilesToDisk: filepath.Abs failed, using raw workDir", "workDir", workDir, "error", err)
 	}
-	attachDir := filepath.Join(absWorkDir, ".cc-connect", "attachments")
+	attachDir := filepath.Join(appid.WorkspaceDir(absWorkDir), "attachments")
 	scoped := false
 	if messageID != "" {
 		safeMid := sanitizeAttachmentFileName(messageID)
@@ -315,7 +319,7 @@ func sanitizeAttachmentFileName(name string) string {
 // File paths are defensively absolutized so the prompt handed to the agent
 // always points at a real on-disk location, even when a caller passed a
 // relative path by mistake. This guards against the issue #1459 class of
-// bugs where the prompt referenced ".cc-connect/attachments/<file>" while
+// bugs where the prompt referenced ".magpie/attachments/<file>" while
 // the file actually landed at the absolute version of workDir. Absolute
 // inputs are passed through unchanged. An unresolvable relative path falls
 // back to the raw input rather than dropping the reference.

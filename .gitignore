@@ -1,8 +1,8 @@
 # ============================================================================
 # Binary outputs
 # ============================================================================
-/cc-connect
-cc-connect.bak-*
+/magpie
+magpie.bak-*
 *.exe
 *.exe~
 *.dll
@@ -46,7 +46,9 @@ config.*.toml
 # Instance lock files (created at startup, released on shutdown)
 *.toml.lock
 
-# CC-Connect runtime state
+# Magpie runtime state. The pre-rename directory stays listed because the
+# runtime keeps using an existing .cc-connect/ rather than creating a second one.
+.magpie/
 .cc-connect/
 
 # npm / pnpm (for npm package distribution and web admin)
@@ -152,4 +154,4 @@ secrets/
 credentials/
 
 .codex
-cc-connect-new
+magpie-new

@@ -13,10 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-)
 
-const (
-	launchdLabel = "com.cc-connect.service"
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 var runLaunchctl = func(args ...string) (string, error) {
@@ -58,7 +56,7 @@ func (m *launchdManager) Install(cfg Config) error {
 	// LaunchAgents path; root can still read but that is the user's own
 	// machine boundary. os.WriteFile only applies perm on create, so
 	// Chmod afterwards is required to harden reinstalls of files that
-	// pre-existed at 0644 from earlier cc-connect versions.
+	// pre-existed at 0644 from earlier magpie versions.
 	if err := os.WriteFile(plistPath, []byte(plist), 0600); err != nil {
 		return fmt.Errorf("write plist: %w", err)
 	}
@@ -190,8 +188,29 @@ func (*launchdManager) Status() (*Status, error) {
 // ── helpers ─────────────────────────────────────────────────
 
 func launchdPlistPath() string {
+	return launchdPlistPathFor(launchdLabel())
+}
+
+func launchdPlistPathFor(label string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "Library", "LaunchAgents", launchdLabel+".plist")
+	return filepath.Join(home, "Library", "LaunchAgents", label+".plist")
+}
+
+// launchdLabel is the label this machine's service is addressed by.
+//
+// A service installed before the rename keeps running as com.cc-connect.service
+// until it is uninstalled, so status, restart and uninstall have to address it
+// by that name — and install has to overwrite that plist in place, rather than
+// leave it loaded and add a second service under the new label. Running
+// `daemon uninstall` once, then installing again, moves onto appid.ServiceLabel.
+func launchdLabel() string {
+	if _, err := os.Stat(launchdPlistPathFor(appid.ServiceLabel)); err == nil {
+		return appid.ServiceLabel
+	}
+	if _, err := os.Stat(launchdPlistPathFor(appid.LegacyServiceLabel)); err == nil {
+		return appid.LegacyServiceLabel
+	}
+	return appid.ServiceLabel
 }
 
 func launchdUserDomain() string {
@@ -221,7 +240,7 @@ func launchdDomains() []string {
 }
 
 func launchdTarget(domain string) string {
-	return fmt.Sprintf("%s/%s", domain, launchdLabel)
+	return fmt.Sprintf("%s/%s", domain, launchdLabel())
 }
 
 func launchdTargets() []string {
@@ -252,10 +271,18 @@ func bootoutLaunchdTargets() {
 
 // templateOwnedEnvKeys are keys the plist template renders directly; if
 // they also appear in cfg.EnvExtra the template version wins.
+//
+// The pre-rename names are listed too. They are still honored on read, so
+// letting one through from a captured environment would quietly override the
+// managed value — and it would emit a duplicate <key> into the plist.
 var templateOwnedEnvKeys = map[string]struct{}{
-	"CC_LOG_FILE":     {},
-	"CC_LOG_MAX_SIZE": {},
-	"PATH":            {},
+	appid.EnvName("LOG_FILE"):        {},
+	appid.EnvName("LOG_MAX_SIZE"):    {},
+	appid.EnvName("LOG_MAX_BACKUPS"): {},
+	"CC_LOG_FILE":                    {},
+	"CC_LOG_MAX_SIZE":                {},
+	"CC_LOG_MAX_BACKUPS":             {},
+	"PATH":                           {},
 }
 
 // renderEnvExtraPlist returns the serialized key/value pairs (without the
@@ -332,11 +359,11 @@ func buildPlist(cfg Config) string {
 	</dict>
 	<key>EnvironmentVariables</key>
 	<dict>
-		<key>CC_LOG_FILE</key>
+		<key>MAGPIE_LOG_FILE</key>
 		<string>%s</string>
-		<key>CC_LOG_MAX_SIZE</key>
+		<key>MAGPIE_LOG_MAX_SIZE</key>
 		<string>%d</string>
-		<key>CC_LOG_MAX_BACKUPS</key>
+		<key>MAGPIE_LOG_MAX_BACKUPS</key>
 		<string>%d</string>
 		<key>PATH</key>
 		<string>%s</string>
@@ -347,6 +374,5 @@ func buildPlist(cfg Config) string {
 	<string>/dev/null</string>
 </dict>
 </plist>
-`, launchdLabel, xmlEscape(cfg.BinaryPath), xmlEscape(cfg.WorkDir), xmlEscape(cfg.LogFile), cfg.LogMaxSize, cfg.LogMaxBackups, xmlEscape(envPATH), envExtra)
+`, launchdLabel(), xmlEscape(cfg.BinaryPath), xmlEscape(cfg.WorkDir), xmlEscape(cfg.LogFile), cfg.LogMaxSize, cfg.LogMaxBackups, xmlEscape(envPATH), envExtra)
 }
-

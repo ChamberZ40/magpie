@@ -11,10 +11,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-)
 
-const (
-	systemdServiceName = ServiceName + ".service"
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 type systemdManager struct {
@@ -65,7 +63,7 @@ func (m *systemdManager) Install(cfg Config) error {
 	// readable by root only; for user-level units under
 	// ~/.config/systemd/user it remains owner-only. WriteFile only applies
 	// perm on create, so Chmod afterwards is required to harden reinstalls
-	// of pre-existing 0644 units from earlier cc-connect versions.
+	// of pre-existing 0644 units from earlier magpie versions.
 	if err := os.WriteFile(unitPath, []byte(unit), 0600); err != nil {
 		return fmt.Errorf("write unit file: %w", err)
 	}
@@ -75,8 +73,8 @@ func (m *systemdManager) Install(cfg Config) error {
 
 	for _, cmdArgs := range [][]string{
 		m.sysArgs("daemon-reload"),
-		m.sysArgs("enable", systemdServiceName),
-		m.sysArgs("restart", systemdServiceName),
+		m.sysArgs("enable", m.serviceName()),
+		m.sysArgs("restart", m.serviceName()),
 	} {
 		if out, err := runSystemctl(cmdArgs...); err != nil {
 			return fmt.Errorf("systemctl %s: %s (%w)", strings.Join(cmdArgs, " "), out, err)
@@ -87,7 +85,7 @@ func (m *systemdManager) Install(cfg Config) error {
 }
 
 func (m *systemdManager) Uninstall() error {
-	if _, err := runSystemctl(m.sysArgs("disable", "--now", systemdServiceName)...); err != nil {
+	if _, err := runSystemctl(m.sysArgs("disable", "--now", m.serviceName())...); err != nil {
 		slog.Warn("systemd: disable failed", "error", err)
 	}
 
@@ -103,7 +101,7 @@ func (m *systemdManager) Uninstall() error {
 }
 
 func (m *systemdManager) Start() error {
-	out, err := runSystemctl(m.sysArgs("start", systemdServiceName)...)
+	out, err := runSystemctl(m.sysArgs("start", m.serviceName())...)
 	if err != nil {
 		return fmt.Errorf("start: %s (%w)", out, err)
 	}
@@ -111,7 +109,7 @@ func (m *systemdManager) Start() error {
 }
 
 func (m *systemdManager) Stop() error {
-	out, err := runSystemctl(m.sysArgs("stop", systemdServiceName)...)
+	out, err := runSystemctl(m.sysArgs("stop", m.serviceName())...)
 	if err != nil {
 		return fmt.Errorf("stop: %s (%w)", out, err)
 	}
@@ -119,7 +117,7 @@ func (m *systemdManager) Stop() error {
 }
 
 func (m *systemdManager) Restart() error {
-	out, err := runSystemctl(m.sysArgs("restart", systemdServiceName)...)
+	out, err := runSystemctl(m.sysArgs("restart", m.serviceName())...)
 	if err != nil {
 		return fmt.Errorf("restart: %s (%w)", out, err)
 	}
@@ -135,7 +133,7 @@ func (m *systemdManager) Status() (*Status, error) {
 	}
 	st.Installed = true
 
-	out, err := runSystemctl(m.sysArgs("show", systemdServiceName,
+	out, err := runSystemctl(m.sysArgs("show", m.serviceName(),
 		"--no-page", "--property", "ActiveState,MainPID")...)
 	if err != nil {
 		return st, nil
@@ -161,18 +159,42 @@ func (m *systemdManager) sysArgs(args ...string) []string {
 	return append([]string{"--user"}, args...)
 }
 
-func (m *systemdManager) unitPath() string {
+func (m *systemdManager) unitDir() string {
 	if m.system {
-		return filepath.Join("/etc/systemd/system", systemdServiceName)
+		return "/etc/systemd/system"
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "systemd", "user", systemdServiceName)
+	return filepath.Join(home, ".config", "systemd", "user")
+}
+
+func (m *systemdManager) unitPath() string {
+	return filepath.Join(m.unitDir(), m.serviceName())
+}
+
+// serviceName is the unit this machine's service is addressed by.
+//
+// A service installed before the rename stays registered as cc-connect.service
+// until it is uninstalled, so start, stop, status and uninstall have to name it
+// that way — and install has to overwrite that unit in place, rather than leave
+// it enabled and register a second one. Running `daemon uninstall` once, then
+// installing again, moves onto magpie.service.
+func (m *systemdManager) serviceName() string {
+	dir := m.unitDir()
+	current := appid.Name + ".service"
+	if _, err := os.Stat(filepath.Join(dir, current)); err == nil {
+		return current
+	}
+	legacy := appid.LegacyName + ".service"
+	if _, err := os.Stat(filepath.Join(dir, legacy)); err == nil {
+		return legacy
+	}
+	return current
 }
 
 func (m *systemdManager) buildUnit(cfg Config) string {
 	var sb strings.Builder
 	sb.WriteString("[Unit]\n")
-	sb.WriteString("Description=cc-connect - AI Agent Chat Bridge\n")
+	sb.WriteString("Description=magpie - AI Agent Chat Bridge\n")
 	sb.WriteString("After=network-online.target\n")
 	sb.WriteString("Wants=network-online.target\n\n")
 
@@ -182,9 +204,9 @@ func (m *systemdManager) buildUnit(cfg Config) string {
 	fmt.Fprintf(&sb, "WorkingDirectory=%s\n", cfg.WorkDir)
 	sb.WriteString("Restart=on-failure\n")
 	sb.WriteString("RestartSec=10\n")
-	fmt.Fprintf(&sb, "Environment=\"CC_LOG_FILE=%s\"\n", cfg.LogFile)
-	fmt.Fprintf(&sb, "Environment=\"CC_LOG_MAX_SIZE=%d\"\n", cfg.LogMaxSize)
-	fmt.Fprintf(&sb, "Environment=\"CC_LOG_MAX_BACKUPS=%d\"\n", cfg.LogMaxBackups)
+	fmt.Fprintf(&sb, "Environment=\"MAGPIE_LOG_FILE=%s\"\n", cfg.LogFile)
+	fmt.Fprintf(&sb, "Environment=\"MAGPIE_LOG_MAX_SIZE=%d\"\n", cfg.LogMaxSize)
+	fmt.Fprintf(&sb, "Environment=\"MAGPIE_LOG_MAX_BACKUPS=%d\"\n", cfg.LogMaxBackups)
 	if cfg.EnvPATH != "" {
 		fmt.Fprintf(&sb, "Environment=\"PATH=%s\"\n", cfg.EnvPATH)
 	}
@@ -277,16 +299,16 @@ func checkSystemdRunning(system bool) error {
 				"  Add the following to /etc/wsl.conf and restart WSL (wsl --shutdown):\n" +
 				"    [boot]\n" +
 				"    systemd=true\n" +
-				"  Or use: nohup cc-connect > cc-connect.log 2>&1 &")
+				"  Or use: nohup magpie > magpie.log 2>&1 &")
 		}
 		if state == "offline" || strings.Contains(state, "not been booted") {
 			return fmt.Errorf("systemd is not active (state: %s).\n"+
 				"  If running in a container, systemd is typically not available.\n"+
 				"  Use nohup, tmux, or screen instead:\n"+
-				"    nohup cc-connect > cc-connect.log 2>&1 &", state)
+				"    nohup magpie > magpie.log 2>&1 &", state)
 		}
 		return fmt.Errorf("systemd check failed (state: %s).\n"+
-			"  Use nohup as alternative: nohup cc-connect > cc-connect.log 2>&1 &", state)
+			"  Use nohup as alternative: nohup magpie > magpie.log 2>&1 &", state)
 	}
 
 	// User-level failures
@@ -295,16 +317,16 @@ func checkSystemdRunning(system bool) error {
 			"  Add the following to /etc/wsl.conf and restart WSL (wsl --shutdown):\n" +
 			"    [boot]\n" +
 			"    systemd=true\n" +
-			"  Or use: nohup cc-connect > cc-connect.log 2>&1 &")
+			"  Or use: nohup magpie > magpie.log 2>&1 &")
 	}
 
 	user := os.Getenv("USER")
 	return fmt.Errorf("systemd user session not available.\n"+
 		"  This often happens when connecting via SSH without a systemd login session.\n"+
 		"  Try one of:\n"+
-		"    1. Run as root: sudo cc-connect daemon install (uses system-level systemd)\n"+
+		"    1. Run as root: sudo magpie daemon install (uses system-level systemd)\n"+
 		"    2. loginctl enable-linger %s && export XDG_RUNTIME_DIR=/run/user/$(id -u)\n"+
-		"    3. Use nohup/tmux instead: nohup cc-connect > cc-connect.log 2>&1 &", user)
+		"    3. Use nohup/tmux instead: nohup magpie > magpie.log 2>&1 &", user)
 }
 
 func isWSL2() bool {

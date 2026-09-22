@@ -16,8 +16,8 @@ import (
 )
 
 // DefaultMaxAttachmentSize is the default per-attachment size limit (50 MiB)
-// applied by the /send API and `cc-connect send` when max_attachment_size_mb
-// is unset. Exported so cmd/cc-connect can resolve the same default.
+// applied by the /send API and `magpie send` when max_attachment_size_mb
+// is unset. Exported so cmd/magpie can resolve the same default.
 const DefaultMaxAttachmentSize int64 = 50 << 20
 
 // APIServer exposes a local Unix socket API for external tools (e.g. cron jobs)
@@ -45,7 +45,7 @@ type APIServer struct {
 // bubble) instead of FileSender (generic file download). The fields
 // reuse FileAttachment as the wire format because audio/video clips
 // are byte blobs with a name + mime — the dedicated typing happens at
-// the dispatch layer in engine.go. See cc-connect internal task
+// the dispatch layer in engine.go. See magpie internal task
 // t-20260615-cqjbk1.
 type SendRequest struct {
 	Project    string            `json:"project"`
@@ -387,7 +387,7 @@ func (s *APIServer) handleCronAdd(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if sessionKey == "" {
-		http.Error(w, "session_key is required: set CC_SESSION_KEY env, pass --session-key, or ensure exactly one active session exists", http.StatusBadRequest)
+		http.Error(w, "session_key is required: set MAGPIE_SESSION_KEY env, pass --session-key, or ensure exactly one active session exists", http.StatusBadRequest)
 		return
 	}
 

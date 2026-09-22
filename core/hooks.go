@@ -11,20 +11,22 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 // HookEventType enumerates the lifecycle events that can trigger hooks.
 type HookEventType string
 
 const (
-	HookEventMessageReceived    HookEventType = "message.received"
-	HookEventMessageSent        HookEventType = "message.sent"
-	HookEventSessionStarted     HookEventType = "session.started"
-	HookEventSessionEnded       HookEventType = "session.ended"
-	HookEventCronTriggered      HookEventType = "cron.triggered"
-	HookEventTimerTriggered     HookEventType = "timer.triggered"
+	HookEventMessageReceived     HookEventType = "message.received"
+	HookEventMessageSent         HookEventType = "message.sent"
+	HookEventSessionStarted      HookEventType = "session.started"
+	HookEventSessionEnded        HookEventType = "session.ended"
+	HookEventCronTriggered       HookEventType = "cron.triggered"
+	HookEventTimerTriggered      HookEventType = "timer.triggered"
 	HookEventPermissionRequested HookEventType = "permission.requested"
-	HookEventError              HookEventType = "error"
+	HookEventError               HookEventType = "error"
 )
 
 // HookHandlerType is the execution strategy for a hook.
@@ -38,7 +40,7 @@ const (
 // HookConfig is the user-facing configuration for a single hook rule.
 type HookConfig struct {
 	Event   string `toml:"event" json:"event"`
-	Type    string `toml:"type" json:"type"`       // "command" or "http"
+	Type    string `toml:"type" json:"type"` // "command" or "http"
 	Command string `toml:"command" json:"command,omitempty"`
 	URL     string `toml:"url" json:"url,omitempty"`
 	Timeout int    `toml:"timeout" json:"timeout,omitempty"` // seconds; 0 = default (10s cmd, 5s http)
@@ -75,13 +77,13 @@ type HookEvent struct {
 
 // HookManager dispatches lifecycle events to configured hook handlers.
 type HookManager struct {
-	hooks       []HookConfig
-	project     string
-	shell       string // shell binary (e.g. "sh", "/bin/zsh")
-	shellFlag   string // shell flag (e.g. "-c", "-Command")
+	hooks        []HookConfig
+	project      string
+	shell        string // shell binary (e.g. "sh", "/bin/zsh")
+	shellFlag    string // shell flag (e.g. "-c", "-Command")
 	shellProfile string // prepended to every command
-	mu          sync.RWMutex
-	client      *http.Client
+	mu           sync.RWMutex
+	client       *http.Client
 }
 
 // NewHookManager creates a manager for the given project name.
@@ -95,12 +97,12 @@ func NewHookManager(project string, hooks []HookConfig, shell, shellFlag, shellP
 		valid = append(valid, h)
 	}
 	return &HookManager{
-		hooks:       valid,
-		project:     project,
-		shell:       shell,
-		shellFlag:   shellFlag,
+		hooks:        valid,
+		project:      project,
+		shell:        shell,
+		shellFlag:    shellFlag,
 		shellProfile: shellProfile,
-		client:      &http.Client{},
+		client:       &http.Client{},
 	}
 }
 
@@ -213,7 +215,7 @@ func (hm *HookManager) executeHTTP(h *HookConfig, event HookEvent) {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "CC-Connect-Hooks/1.0")
+	req.Header.Set("User-Agent", "Magpie-Hooks/1.0")
 	req.Header.Set("X-Hook-Event", string(event.Event))
 
 	resp, err := hm.client.Do(req)
@@ -240,29 +242,34 @@ func (hm *HookManager) executeHTTP(h *HookConfig, event HookEvent) {
 }
 
 // eventToEnv converts a HookEvent to environment variables for shell hooks.
+//
+// Every variable is exported twice, as MAGPIE_HOOK_* and under the pre-rename
+// CC_HOOK_* name. Hook scripts are written by users and live outside this
+// repository, so dropping the old names would break them with no warning.
 func eventToEnv(e HookEvent) []string {
-	env := []string{
-		"CC_HOOK_EVENT=" + string(e.Event),
-		"CC_HOOK_PROJECT=" + e.Project,
-		"CC_HOOK_TIMESTAMP=" + e.Timestamp.Format(time.RFC3339),
+	pairs := [][2]string{
+		{"HOOK_EVENT", string(e.Event)},
+		{"HOOK_PROJECT", e.Project},
+		{"HOOK_TIMESTAMP", e.Timestamp.Format(time.RFC3339)},
 	}
-	if e.SessionKey != "" {
-		env = append(env, "CC_HOOK_SESSION_KEY="+e.SessionKey)
+	// The rest are omitted entirely when empty, so a script can distinguish
+	// "no user attached to this event" from "the user has an empty name".
+	for _, optional := range [][2]string{
+		{"HOOK_SESSION_KEY", e.SessionKey},
+		{"HOOK_PLATFORM", e.Platform},
+		{"HOOK_USER_ID", e.UserID},
+		{"HOOK_USER_NAME", e.UserName},
+		{"HOOK_CONTENT", e.Content},
+		{"HOOK_ERROR", e.Error},
+	} {
+		if optional[1] != "" {
+			pairs = append(pairs, optional)
+		}
 	}
-	if e.Platform != "" {
-		env = append(env, "CC_HOOK_PLATFORM="+e.Platform)
-	}
-	if e.UserID != "" {
-		env = append(env, "CC_HOOK_USER_ID="+e.UserID)
-	}
-	if e.UserName != "" {
-		env = append(env, "CC_HOOK_USER_NAME="+e.UserName)
-	}
-	if e.Content != "" {
-		env = append(env, "CC_HOOK_CONTENT="+e.Content)
-	}
-	if e.Error != "" {
-		env = append(env, "CC_HOOK_ERROR="+e.Error)
+
+	env := make([]string, 0, 2*len(pairs))
+	for _, p := range pairs {
+		env = append(env, appid.EnvPair(p[0], p[1])...)
 	}
 	return env
 }

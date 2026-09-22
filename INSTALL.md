@@ -1,14 +1,14 @@
-# cc-connect Installation & Configuration Guide
+# magpie Installation & Configuration Guide
 
-> **This document is designed to be read by AI coding agents (Claude Code, Cursor, Codex, etc.) to help users install and configure cc-connect.** You can feed this file directly to your AI agent.
+> **This document is designed to be read by AI coding agents (Claude Code, Cursor, Codex, etc.) to help users install and configure magpie.** You can feed this file directly to your AI agent.
 
-## What is cc-connect?
+## What is magpie?
 
-cc-connect bridges local AI coding assistants to messaging platforms (Feishu/Lark, WeChat Work, **personal WeChat** via the **Weixin (ilink)** platform).
+magpie bridges local AI coding assistants to messaging platforms (Feishu/Lark, WeChat Work, **personal WeChat** via the **Weixin (ilink)** platform).
 
-GitHub: https://github.com/chenhg5/cc-connect
+GitHub: https://github.com/ChamberZ40/magpie
 
-**IMPORTANT: If you are an AI agent helping a user install cc-connect, use interactive tools (like AskUserQuestion) to guide them through configuration choices:**
+**IMPORTANT: If you are an AI agent helping a user install magpie, use interactive tools (like AskUserQuestion) to guide them through configuration choices:**
 - Agent selection (Claude Code, Codex, Cursor, Copilot, ACP)
 - Platform selection (Feishu, WeChat Work, Weixin)
 - API keys and authentication tokens
@@ -16,60 +16,54 @@ GitHub: https://github.com/chenhg5/cc-connect
 
 Don't guess values—always ask the user to choose via interactive prompts.
 
-## Step 1: Install cc-connect
+## Step 1: Install magpie
 
-### Option A: npm (recommended for most users)
+### Option A: Build from source (recommended)
 
-```bash
-npm install -g cc-connect
-```
-
-After installation, the `cc-connect` binary will be available globally.
-
-
-### Option B: Homebrew (macOS / Linux)
+Requires Go 1.25+ and Node.js (`make build` also rebuilds the embedded Web UI).
 
 ```bash
-brew install cc-connect
+git clone https://github.com/ChamberZ40/magpie.git
+cd magpie
+make build
+# Binary will be at ./magpie
 ```
+
+### Option B: npm
+
+```bash
+npm install -g @chamberz40/magpie
+```
+
+The postinstall script downloads the prebuilt binary for this platform from the
+matching GitHub release, so the `magpie` command becomes available globally.
 
 ### Option C: Download binary from GitHub Releases
 
-Go to https://github.com/chenhg5/cc-connect/releases and download the binary for your platform.
+Go to https://github.com/ChamberZ40/magpie/releases and download the binary for your platform.
 
 Typical artifact names (check the release page for exact filenames):
 
-- Linux: `cc-connect-<version>-linux-amd64` (or `.tar.gz`)
-- macOS: `cc-connect-<version>-darwin-amd64` / `arm64`
-- Windows: `cc-connect-<version>-windows-amd64.exe` (or `.zip`)
+- Linux: `magpie-<version>-linux-amd64` (or `.tar.gz`)
+- macOS: `magpie-<version>-darwin-amd64` / `arm64`
+- Windows: `magpie-<version>-windows-amd64.exe` (or `.zip`)
 
 ```bash
 # Example for Linux amd64 (replace URL with the asset link from the release you chose):
-curl -L -o cc-connect https://github.com/chenhg5/cc-connect/releases/latest/download/cc-connect-linux-amd64
-chmod +x cc-connect
-sudo mv cc-connect /usr/local/bin/
+curl -L -o magpie https://github.com/ChamberZ40/magpie/releases/latest/download/magpie-linux-amd64
+chmod +x magpie
+sudo mv magpie /usr/local/bin/
 ```
 
 On macOS, you may need to remove the quarantine attribute:
 
 ```bash
-xattr -d com.apple.quarantine cc-connect
-```
-
-### Option D: Build from source
-
-Requires Go 1.22+.
-
-```bash
-git clone https://github.com/chenhg5/cc-connect.git
-cd cc-connect
-make build
-# Binary will be at ./cc-connect
+xattr -d com.apple.quarantine magpie
 ```
 
 ## Step 2: Install your AI Agent
 
-cc-connect supports multiple local coding agents. Install at least one:
+magpie supports multiple local coding agents. Install at least one:
 
 ```bash
 # Claude Code
@@ -98,22 +92,22 @@ cursor-agent --version
 
 ## Step 3: Create config.toml
 
-> **💡 Recommended: Use the Web UI** — After installing, run `cc-connect web` to configure the web admin and open the dashboard in your browser. You can visually create projects, add platforms, manage API providers, and even chat with your agent directly from the browser — no need to edit TOML files by hand. **Note:** `cc-connect web` only configures and opens the browser — you still need to run `cc-connect` separately to start the service.
+> **💡 Recommended: Use the Web UI** — After installing, run `magpie web` to configure the web admin and open the dashboard in your browser. You can visually create projects, add platforms, manage API providers, and even chat with your agent directly from the browser — no need to edit TOML files by hand. **Note:** `magpie web` only configures and opens the browser — you still need to run `magpie` separately to start the service.
 
-If you prefer manual configuration, cc-connect looks for config in this order:
+If you prefer manual configuration, magpie looks for config in this order:
 1. `-config <path>` flag (explicit)
 2. `./config.toml` (current directory)
-3. `~/.cc-connect/config.toml` (global, **recommended**)
+3. `~/.magpie/config.toml` (global, **recommended**)
 
-If no config file exists, running `cc-connect` will auto-create a starter template at `~/.cc-connect/config.toml`.
+If no config file exists, running `magpie` will auto-create a starter template at `~/.magpie/config.toml`.
 
 **Manual config location:**
 
 ```bash
-mkdir -p ~/.cc-connect
+mkdir -p ~/.magpie
 # If you cloned the repo, copy the example:
-cp config.example.toml ~/.cc-connect/config.toml
-# Or just run cc-connect once — it will create a starter config automatically
+cp config.example.toml ~/.magpie/config.toml
+# Or just run magpie once — it will create a starter config automatically
 ```
 
 You can also use a local config in the current directory:
@@ -173,13 +167,13 @@ Connection: WebSocket long connection (SDK auto-negotiates)
 
 ```bash
 # Recommended: unified entry
-cc-connect feishu setup --project my-project
-cc-connect feishu setup --project my-project --app cli_xxx:sec_xxx
+magpie feishu setup --project my-project
+magpie feishu setup --project my-project --app cli_xxx:sec_xxx
 
 # Force modes (usually unnecessary)
-cc-connect feishu new --project my-project
+magpie feishu new --project my-project
 
-cc-connect feishu bind --project my-project --app cli_xxx:sec_xxx
+magpie feishu bind --project my-project --app cli_xxx:sec_xxx
 ```
 
 Notes:
@@ -187,7 +181,7 @@ Notes:
   - no credentials => same as `new`
   - with `--app`/`--app-id` => same as `bind`
 - `setup/new` prints a terminal QR code + URL for mobile scanning.
-- If `--project` does not exist, cc-connect creates it automatically.
+- If `--project` does not exist, magpie creates it automatically.
 - This flow fills `app_id` / `app_secret`; in QR onboarding flow, Feishu usually pre-configures permissions and event subscriptions.
 - Still verify app publish status and availability scope in Feishu Open Platform.
 
@@ -226,7 +220,7 @@ Connection: HTTP Webhook (you need ngrok, cloudflared, or a server with public I
    - URL: `https://<your-public-domain>:<port>/wecom/callback`
    - Token: any random string
    - EncodingAESKey: click "Random Generate" (43 chars)
-   - **Start cc-connect FIRST, then save** (to pass URL verification)
+   - **Start magpie FIRST, then save** (to pass URL verification)
 5. **Trusted IP** → add your server's outbound public IP
 6. (Optional) **WeChat Plugin** → scan QR to link personal WeChat
 
@@ -258,49 +252,49 @@ Personal WeChat uses Tencent’s **ilink bot HTTP API** (same family as OpenClaw
 1. Run:
 
    ```bash
-   cc-connect weixin setup --project my-project
+   magpie weixin setup --project my-project
    ```
 
 2. Scan the QR code (or open the printed URL) in WeChat and confirm.
 
-3. Restart cc-connect, then send a message from WeChat once so `context_token` is cached.
+3. Restart magpie, then send a message from WeChat once so `context_token` is cached.
 
-If you already have a Bearer token, use `cc-connect weixin bind --project my-project --token '<token>'`.
+If you already have a Bearer token, use `magpie weixin bind --project my-project --token '<token>'`.
 
 **Detailed guide (Chinese):** [docs/weixin.md](docs/weixin.md)
 
 ---
 
-## Step 5: Run cc-connect
+## Step 5: Run magpie
 
 **Open the Web UI (recommended):**
 
 ```bash
-cc-connect web    # configure web admin & open browser (does NOT start cc-connect)
-cc-connect        # start the service
+magpie web    # configure web admin & open browser (does NOT start magpie)
+magpie        # start the service
 ```
 
-> **Note:** `cc-connect web` only configures the web admin and opens the dashboard in your browser — it does **not** start the cc-connect service itself. You still need to run `cc-connect` (or `cc-connect --config <path>`) separately to actually start the bridge. Think of it as two steps: configure first, then run.
+> **Note:** `magpie web` only configures the web admin and opens the dashboard in your browser — it does **not** start the magpie service itself. You still need to run `magpie` (or `magpie --config <path>`) separately to actually start the bridge. Think of it as two steps: configure first, then run.
 
-**Important: If you are running inside a Claude Code session** (e.g., Claude Code helped you install and configure cc-connect), you must unset the `CLAUDECODE` environment variable before starting, otherwise Claude Code will refuse to launch as a subprocess:
+**Important: If you are running inside a Claude Code session** (e.g., Claude Code helped you install and configure magpie), you must unset the `CLAUDECODE` environment variable before starting, otherwise Claude Code will refuse to launch as a subprocess:
 
 ```bash
-unset CLAUDECODE && cc-connect
+unset CLAUDECODE && magpie
 ```
 
-Alternatively, open a **separate terminal** and run cc-connect there — this avoids the issue entirely.
+Alternatively, open a **separate terminal** and run magpie there — this avoids the issue entirely.
 
 **Normal startup:**
 
 ```bash
 # Run with config.toml in current directory
-cc-connect
+magpie
 
 # Or specify config path
-cc-connect -config /path/to/config.toml
+magpie -config /path/to/config.toml
 
 # Check version
-cc-connect --version
+magpie --version
 ```
 
 You should see logs like:
@@ -308,7 +302,7 @@ You should see logs like:
 ```
 level=INFO msg="platform started" project=my-project platform=feishu
 level=INFO msg="engine started" project=my-project agent=claudecode platforms=1
-level=INFO msg="cc-connect is running" projects=1
+level=INFO msg="magpie is running" projects=1
 ```
 
 ## Step 6: Chat Commands
@@ -337,7 +331,7 @@ During a session, Claude may ask for tool permissions. Reply:
 
 ## Step 7: Enable Natural Language Scheduling (Non-Claude-Code Agents)
 
-cc-connect supports scheduled tasks (cron jobs). You can always create them via slash commands (`/cron add ...`) or CLI (`cc-connect cron add ...`), but to let the agent **understand natural language** like "every day at 6am, summarize trending repos", the agent needs to know about cc-connect's cron CLI.
+magpie supports scheduled tasks (cron jobs). You can always create them via slash commands (`/cron add ...`) or CLI (`magpie cron add ...`), but to let the agent **understand natural language** like "every day at 6am, summarize trending repos", the agent needs to know about magpie's cron CLI.
 
 **Claude Code** handles this automatically via `--append-system-prompt` — no extra setup needed.
 
@@ -353,59 +347,59 @@ cc-connect supports scheduled tasks (cron jobs). You can always create them via 
 **Content to add** (copy-paste into the file):
 
 ```markdown
-# cc-connect Integration
+# magpie Integration
 
-This project is managed via cc-connect, a bridge to messaging platforms.
+This project is managed via magpie, a bridge to messaging platforms.
 
 ## Scheduled tasks (cron)
 When the user asks you to do something on a schedule (e.g. "every day at 6am",
 "every Monday morning"), use the Bash/shell tool to run:
 
-  cc-connect cron add --cron "<min> <hour> <day> <month> <weekday>" --prompt "<task description>" --desc "<short label>"
+  magpie cron add --cron "<min> <hour> <day> <month> <weekday>" --prompt "<task description>" --desc "<short label>"
 
 Environment variables CC_PROJECT and CC_SESSION_KEY are already set — do NOT
 specify --project or --session-key.
 
 Examples:
-  cc-connect cron add --cron "0 6 * * *" --prompt "Collect GitHub trending repos and send a summary" --desc "Daily GitHub Trending"
-  cc-connect cron add --cron "0 9 * * 1" --prompt "Generate a weekly project status report" --desc "Weekly Report"
+  magpie cron add --cron "0 6 * * *" --prompt "Collect GitHub trending repos and send a summary" --desc "Daily GitHub Trending"
+  magpie cron add --cron "0 9 * * 1" --prompt "Generate a weekly project status report" --desc "Weekly Report"
 
 To list, run, edit, or delete cron jobs:
-  cc-connect cron list
-  cc-connect cron exec <job-id>
-  cc-connect cron edit <job-id> <field> <value>
-  cc-connect cron del <job-id>
+  magpie cron list
+  magpie cron exec <job-id>
+  magpie cron edit <job-id> <field> <value>
+  magpie cron del <job-id>
 
 Use `cron exec <job-id>` to run an existing scheduled task immediately; this is different from the `--exec <command>` flag used when creating a shell-command cron job.
 Use `cron edit` to modify a single field instead of delete-and-recreate.
 Common editable fields: cron_expr, prompt, exec, description, enabled (true/false), mute (true/false), timeout_mins (int).
-Run `cc-connect cron edit --help` for the full field list.
+Run `magpie cron edit --help` for the full field list.
 
 Examples:
-  cc-connect cron exec abc123
-  cc-connect cron edit abc123 cron_expr "0 9 * * *"
-  cc-connect cron edit abc123 enabled false
-  cc-connect cron edit abc123 prompt "Updated daily summary task"
+  magpie cron exec abc123
+  magpie cron edit abc123 cron_expr "0 9 * * *"
+  magpie cron edit abc123 enabled false
+  magpie cron edit abc123 prompt "Updated daily summary task"
 
 ## Send message to current chat
 To proactively send a message back to the user's chat session (use --stdin heredoc for long/multi-line messages):
 
-  cc-connect send --stdin <<'CCEOF'
+  magpie send --stdin <<'CCEOF'
   your message here (any special characters are safe)
   CCEOF
 
 For short single-line messages:
 
-  cc-connect send -m "short message"
+  magpie send -m "short message"
 ```
 
-After adding this file, the agent will be able to translate natural language scheduling requests into `cc-connect cron add` commands automatically.
+After adding this file, the agent will be able to translate natural language scheduling requests into `magpie cron add` commands automatically.
 
-> **Tip:** You may want to add `AGENTS.md` / `.cursorrules` to your `.gitignore` if you don't want cc-connect instructions committed to version control.
+> **Tip:** You may want to add `AGENTS.md` / `.cursorrules` to your `.gitignore` if you don't want magpie instructions committed to version control.
 
 ## Multi-Project Setup
 
-A single cc-connect process can manage multiple projects. Each project has its own agent, work directory, and platforms:
+A single magpie process can manage multiple projects. Each project has its own agent, work directory, and platforms:
 
 ```toml
 [[projects]]
@@ -468,58 +462,58 @@ token = "your-ilink-bearer-token"
 ### Check current version
 
 ```bash
-cc-connect --version
+magpie --version
 ```
 
 ### npm users
 
 ```bash
-npm update -g cc-connect
+npm update -g magpie
 ```
 
 ### Binary users
 
-Check the latest release at https://github.com/chenhg5/cc-connect/releases and compare with your local version. To upgrade:
+Check the latest release at https://github.com/ChamberZ40/magpie/releases and compare with your local version. To upgrade:
 
 ```bash
 # Linux/macOS — replace with your platform suffix
-curl -L -o /usr/local/bin/cc-connect https://github.com/chenhg5/cc-connect/releases/latest/download/cc-connect-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
-chmod +x /usr/local/bin/cc-connect
+curl -L -o /usr/local/bin/magpie https://github.com/ChamberZ40/magpie/releases/latest/download/magpie-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
+chmod +x /usr/local/bin/magpie
 ```
 
 ### Source users
 
 ```bash
-cd cc-connect
+cd magpie
 git pull
 make build
 ```
 
-After upgrading, restart the running cc-connect process.
+After upgrading, restart the running magpie process.
 
 ## Step 8: Run as Background Service (Optional)
 
-You can run cc-connect as a daemon managed by the OS init system (Linux systemd user service, macOS launchd LaunchAgent, Windows Task Scheduler task).
+You can run magpie as a daemon managed by the OS init system (Linux systemd user service, macOS launchd LaunchAgent, Windows Task Scheduler task).
 
 ### Install the daemon
 
 ```bash
-cc-connect daemon install --config ~/.cc-connect/config.toml
+magpie daemon install --config ~/.magpie/config.toml
 ```
 
 You can also point the daemon at the directory that contains `config.toml`:
 
 ```bash
-cc-connect daemon install --work-dir ~/.cc-connect
+magpie daemon install --work-dir ~/.magpie
 ```
 
 Optional flags: `--config PATH`, `--log-file PATH`, `--log-max-size N` (MB), `--work-dir DIR`, `--force` (overwrite existing unit). `--config` points to a config file, while `--work-dir` points to the directory containing `config.toml`.
 
 ### Linux systemd: Keep service running after SSH disconnect
 
-When installed as a user-level systemd service (non-root), cc-connect runs under `user@UID.service`. By default, systemd stops this service when your last login session ends (e.g., SSH disconnect). This is controlled by the "linger" setting.
+When installed as a user-level systemd service (non-root), magpie runs under `user@UID.service`. By default, systemd stops this service when your last login session ends (e.g., SSH disconnect). This is controlled by the "linger" setting.
 
-To keep cc-connect running persistently, enable linger for your user:
+To keep magpie running persistently, enable linger for your user:
 
 ```bash
 sudo loginctl enable-linger $USER
@@ -530,7 +524,7 @@ After enabling linger, `user@UID.service` remains active even when you log out. 
 Alternatively, you can install as a system-level service (requires root):
 
 ```bash
-sudo cc-connect daemon install --config ~/.cc-connect/config.toml
+sudo magpie daemon install --config ~/.magpie/config.toml
 ```
 
 System-level services are independent of login sessions.
@@ -538,32 +532,32 @@ System-level services are independent of login sessions.
 ### Control the service
 
 ```bash
-cc-connect daemon start
-cc-connect daemon stop
-cc-connect daemon restart
-cc-connect daemon status
+magpie daemon start
+magpie daemon stop
+magpie daemon restart
+magpie daemon status
 ```
 
 ### View logs
 
 ```bash
-cc-connect daemon logs           # tail current log
-cc-connect daemon logs -f         # follow (like tail -f)
-cc-connect daemon logs -n 100     # last 100 lines
-cc-connect daemon logs --log-file /path/to/log  # custom log file
+magpie daemon logs           # tail current log
+magpie daemon logs -f         # follow (like tail -f)
+magpie daemon logs -n 100     # last 100 lines
+magpie daemon logs --log-file /path/to/log  # custom log file
 ```
 
 Logs auto-rotate at the configured max size and keep one backup.
 
-On Windows, `daemon install` creates a native Task Scheduler task named `cc-connect`.
+On Windows, `daemon install` creates a native Task Scheduler task named `magpie`.
 The task runs at user logon and is also started immediately after installation. The
-installer writes a small PowerShell launcher under `~/.cc-connect` so the scheduled
+installer writes a small PowerShell launcher under `~/.magpie` so the scheduled
 task uses the selected config directory, log file, PATH, and proxy environment.
 
 ### Uninstall
 
 ```bash
-cc-connect daemon uninstall
+magpie daemon uninstall
 ```
 
 ## Additional Features
@@ -578,13 +572,13 @@ The following additional features are available:
 - **Voice Reply (TTS)**: Text-to-speech via Qwen / OpenAI / MiniMax / MiMo / local providers. Requires `ffmpeg` and `[tts]` config.
 - **Image Messages**: Send images to Claude Code for multimodal analysis
 - **API Provider Management**: Runtime switching between API providers via `/provider` command or CLI
-- **CLI Send**: `cc-connect send` to inject messages into active sessions from external processes
+- **CLI Send**: `magpie send` to inject messages into active sessions from external processes
 
 ## Troubleshooting
 
 - **"session already in use"** — A previous Claude Code process may still be running. Use `/new` to start a fresh session.
-- **No response from bot** — Check `cc-connect` logs. Set `level = "debug"` in `[log]` for verbose output.
+- **No response from bot** — Check `magpie` logs. Set `level = "debug"` in `[log]` for verbose output.
 - **WeChat Work can't send messages** — Ensure your outbound IP is in the Trusted IP whitelist. If using a proxy, check the proxy is reachable.
 - **WeChat Work can't receive messages** — Ensure your webhook URL is publicly accessible (ngrok/cloudflared running).
-- **macOS binary won't open** — Run `xattr -d com.apple.quarantine cc-connect` to remove quarantine flag.
+- **macOS binary won't open** — Run `xattr -d com.apple.quarantine magpie` to remove quarantine flag.
 

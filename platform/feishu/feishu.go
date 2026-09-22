@@ -23,7 +23,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
@@ -336,7 +336,7 @@ func newPlatform(name, domain string, opts map[string]any) (core.Platform, error
 
 	// Parse mention_map for outbound bot-to-bot @ resolution.
 	// Maps agent-friendly names (e.g. "Collector-B") to Feishu open_ids,
-	// so that when an agent writes @Collector-B in its reply, cc-connect
+	// so that when an agent writes @Collector-B in its reply, magpie
 	// converts it to a native Feishu <at> tag that triggers a notification.
 	var mentionMap map[string]string
 	if mentionMapRaw, ok := opts["mention_map"]; ok {
@@ -1242,7 +1242,7 @@ func (p *Platform) flushImageBatchForSession(sessionKey string) {
 
 // flushImageBatches synchronously dispatches any pending image batches.
 // Intended to be called from Stop() so buffered images aren't lost when
-// cc-connect shuts down.
+// magpie shuts down.
 func (p *Platform) flushImageBatches() {
 	p.imageBatchMu.Lock()
 	pending := p.imageBatch
@@ -5518,8 +5518,8 @@ func classifyCommandToolDetail(detail string) (title, icon string, ok bool) {
 	if strings.HasPrefix(command, "gh ") || command == "gh" {
 		return "GitHub", "cloud_outlined", true
 	}
-	if strings.HasPrefix(command, "cc-connect ") || command == "cc-connect" {
-		return "cc-connect", "robot_outlined", true
+	if strings.HasPrefix(command, "magpie ") || command == "magpie" {
+		return "magpie", "robot_outlined", true
 	}
 	if commandHasAnyPrefix(command, "go test", "npm test", "npm run test", "pnpm test", "yarn test", "pytest", "cargo test", "swift test", "xcodebuild test") {
 		return "Run tests", "list-check_outlined", true
@@ -5988,7 +5988,7 @@ func fetchRichCardRemoteImage(ctx context.Context, rawURL string) ([]byte, strin
 	if err != nil {
 		return nil, "", err
 	}
-	req.Header.Set("User-Agent", "cc-connect-feishu-rich-card-image-resolver/1.0")
+	req.Header.Set("User-Agent", "magpie-feishu-rich-card-image-resolver/1.0")
 
 	resp, err := client.Do(req)
 	if err != nil {

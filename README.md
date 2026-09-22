@@ -1,22 +1,38 @@
 <p align="center">
-  <img src="./docs/images/banner.svg" alt="CC-Connect Banner" width="800"/>
+  <img src="./docs/images/banner.svg" alt="Magpie Banner" width="800"/>
 </p>
 
 <p align="center">
   <a href="./README.md">English</a> | <a href="./README.zh-CN.md">中文</a>
 </p>
 
-cc-connect is a bridge between AI coding agents running on your machine and the
-messaging apps you already use. You send a message in Feishu or WeChat; the
-agent runs locally in your project directory; its output comes back to the chat.
+**Magpie puts your AI coding agent in your chat app.** You send a message in
+Feishu or WeChat; the agent runs locally, in your own project directory, with
+your own credentials; its output comes back to the chat. Nothing about your code
+leaves your machine except the text you'd have typed into the agent anyway.
 
-This is a trimmed deployment of [chenhg5/cc-connect](https://github.com/chenhg5/cc-connect)
-carrying only the agents and platforms listed below. This README covers
-deployment and configuration; everything else lives in [docs/](docs/).
+The point is untethering. The agent keeps working on the long task while you
+walk away from the desk, and you steer it from your phone.
 
 <p align="center">
-  <img src="docs/images/connector.png" alt="CC-Connect Architecture" width="90%"/>
+  <img src="docs/images/connector.png" alt="Magpie Architecture" width="90%"/>
 </p>
+
+
+## Quick start
+
+Assumes Go 1.25+ and Node.js (the build embeds a Web UI), and an agent CLI that
+is already installed **and logged in** — see [Install](#install) for both.
+
+```bash
+git clone https://github.com/ChamberZ40/magpie.git
+cd magpie
+make build                 # produces ./magpie
+./magpie                   # writes ~/.magpie/config.toml, prints http://localhost:9820
+```
+
+Open that URL, create a project, paste your bot credentials, save. Magpie
+hot-reloads. Message the bot to confirm the round trip works.
 
 
 ## What's included
@@ -51,17 +67,13 @@ Per-platform capabilities:
 requires `[speech]` / TTS providers in `config.toml`.
 
 
-## Deploy
+## Install
 
-> **Install in this order.** cc-connect is a bridge for *local* agent CLIs, so
-> the agent must be installed and authenticated **before** cc-connect starts.
-> Skipping ahead makes cc-connect exit with `claudecode: claude CLI not found in
-> PATH` (or the equivalent for your agent), and the Web UI on `:9820` never
-> comes up.
+### 1. Install an agent CLI — first
 
-### 1. Install an agent CLI
-
-You need at least one.
+Magpie is a bridge to *local* agent CLIs, so the agent has to exist before
+Magpie starts. Skip this and Magpie exits with `claudecode: claude CLI not
+found in PATH` (or the equivalent), and the Web UI never comes up.
 
 ```bash
 # Claude Code
@@ -75,16 +87,14 @@ npm install -g @openai/codex
 npm install -g @github/copilot
 ```
 
-Cursor Agent: follow <https://docs.cursor.com/agent>.
-Any other ACP-speaking agent is configured as `type = "acp"`.
-
-Confirm the binary is on your `PATH`:
+Cursor Agent: follow <https://docs.cursor.com/agent>. Any other ACP-speaking
+agent is configured as `type = "acp"`.
 
 ```bash
 claude --version       # or: codex / copilot / cursor-agent
 ```
 
-### 2. Authenticate the agent
+### 2. Authenticate it
 
 Run the agent once interactively so it stores credentials in your home
 directory:
@@ -94,30 +104,34 @@ claude login           # opens a browser
 codex login            # or: copilot / cursor-agent — see the agent's docs
 ```
 
-Skip this and cc-connect still starts, but the agent rejects every prompt with
-an auth error.
+Skip this and Magpie still starts, but the agent rejects every prompt with an
+auth error.
 
-### 3. Install cc-connect
+### 3. Install Magpie
 
-```bash
-npm install -g cc-connect     # any platform
-brew install cc-connect       # macOS / Linux
-```
-
-Those two install **upstream's** build, with every agent and platform compiled
-in. To get this trimmed fork, build from source (Go 1.22+, plus Node.js —
-`make build` also rebuilds the embedded Web UI):
+**From source** — the canonical path. Needs Go 1.25+ and Node.js, because
+`make build` also rebuilds the embedded Web UI.
 
 ```bash
-git clone https://github.com/ChamberZ40/Mac-connect.git
-cd Mac-connect
-make build                    # produces ./cc-connect
+git clone https://github.com/ChamberZ40/magpie.git
+cd magpie
+make build                 # produces ./magpie
 ```
+
+**From npm** — downloads a prebuilt binary from the matching GitHub release:
+
+```bash
+npm install -g @chamberz40/magpie
+```
+
+**From a GitHub release** — grab the archive for your platform from
+[Releases](https://github.com/ChamberZ40/magpie/releases), unpack it, and put
+`magpie` on your `PATH`.
 
 ### 4. First run
 
 ```bash
-cc-connect                    # auto-creates ~/.cc-connect/config.toml on first run
+magpie                     # auto-creates ~/.magpie/config.toml
 ```
 
 It prints the admin URL:
@@ -126,44 +140,75 @@ It prints the admin URL:
 Web admin:  http://localhost:9820
 ```
 
-If `9820` is taken, pass `--web-port 9821` or set `web_port` in `config.toml`.
+To move it off 9820, set `port` under `[management]` in `config.toml`.
 
-> `cc-connect web` **only** opens the browser and the config UI — it does not
-> start the bridge. Keep `cc-connect` running separately.
+> `magpie web` **only** opens the browser and the config UI — it does not start
+> the bridge. Keep `magpie` itself running.
 
 ### 5. Add platform credentials
 
-In the Web UI, create a project, add a platform (Feishu / WeChat Work /
-Weixin), and paste the credentials from that platform's developer console.
-Save; cc-connect hot-reloads. Send a message to your bot to confirm.
+In the Web UI, create a project, add a platform (Feishu / WeChat Work / Weixin),
+and paste the credentials from that platform's developer console. Save; Magpie
+hot-reloads. Send a message to your bot to confirm.
 
-### Run as a service
+
+## Run as a service
 
 ```bash
-cc-connect daemon install --config ~/.cc-connect/config.toml
-cc-connect daemon start
-cc-connect daemon status
-cc-connect daemon restart
-cc-connect daemon stop
-cc-connect daemon uninstall
+magpie daemon install --config ~/.magpie/config.toml
+magpie daemon start
+magpie daemon status
+magpie daemon restart
+magpie daemon stop
+magpie daemon uninstall
 ```
 
 This installs a launchd agent on macOS, a systemd unit on Linux, and a Task
-Scheduler task named `cc-connect` on Windows. On Linux, run
+Scheduler task named `magpie` on Windows. On Linux, run
 `loginctl enable-linger $USER` so the unit survives logout — `daemon install`
 warns when linger is off.
+
+### Keeping the host awake
+
+A bridge is only reachable while its host is awake. Once the machine idle
+sleeps, the platform connection drops and messages sit undelivered until
+something wakes it — on a laptop with stock power settings, minutes after you
+walk away. Which defeats the entire point of steering the agent from your phone.
+
+```toml
+[power]
+prevent_sleep = "ac_only"   # "off" (default), "always", or "ac_only"
+```
+
+Magpie holds a macOS power assertion for as long as it runs and releases it on
+shutdown. It deliberately does **not** touch `pmset`: a global setting like that
+outlives a crash, and a Mac that never sleeps again is a far worse failure than
+one that sleeps too eagerly.
+
+| Value | Effect |
+|-------|--------|
+| `off` | No assertion. The machine sleeps on its own schedule. Default. |
+| `always` | Stay awake on battery and on AC. |
+| `ac_only` | Stay awake only while plugged in. |
+
+Limits worth knowing before you rely on it:
+
+- **macOS only.** On Linux and Windows a non-`off` value is logged and ignored.
+- **Closing the lid always sleeps an Apple Silicon laptop**, unless it's in
+  clamshell mode with an external display and power. No software assertion can
+  override that. This setting covers "lid open, left alone".
+- **Not hot-reloadable.** Restart the service after changing it.
 
 
 ## Configure
 
-Config lives at `~/.cc-connect/config.toml`. The Web UI (`cc-connect web`)
-edits it visually — projects, platforms, providers — with no TOML editing. To do
-it by hand:
+Config lives at `~/.magpie/config.toml`. The Web UI (`magpie web`) edits it
+visually — projects, platforms, providers — with no TOML editing. By hand:
 
 ```bash
-mkdir -p ~/.cc-connect
-cp config.example.toml ~/.cc-connect/config.toml
-vim ~/.cc-connect/config.toml
+mkdir -p ~/.magpie
+magpie config example > ~/.magpie/config.toml
+vim ~/.magpie/config.toml
 ```
 
 [config.example.toml](config.example.toml) is the annotated reference for every
@@ -242,22 +287,22 @@ Agents can push generated files back into the chat:
 
 ```toml
 attachment_send = "on"          # default "on"; "off" blocks image/file send-back
-max_attachment_size_mb = 50     # default 50 MiB; or CC_MAX_ATTACHMENT_SIZE_MB
+max_attachment_size_mb = 50     # default 50 MiB
 ```
 
 ```bash
-cc-connect send --image /absolute/path/to/chart.png
-cc-connect send --file /absolute/path/to/report.pdf
-cc-connect send --tts "Hello from cc-connect"
+magpie send --image /absolute/path/to/chart.png
+magpie send --file /absolute/path/to/report.pdf
+magpie send --tts "Hello from magpie"
 ```
 
 Currently delivered on Feishu. Absolute paths are safest; `--image` and `--file`
 may both be repeated. This switch is independent of the agent's `/mode` — it
-only gates `cc-connect send`, and ordinary text replies keep working when it is
+only gates `magpie send`, and ordinary text replies keep working when it is
 `off`. Voice send-back uses the `[speech]` TTS config instead.
 
 If your agent does not natively inject the system prompt, run `/bind setup` (or
-`/cron setup`) once in chat after rebuilding, to refresh the cc-connect
+`/cron setup`) once in chat after rebuilding, to refresh the Magpie
 instructions in the project memory file.
 
 ### Scheduled tasks
@@ -269,7 +314,7 @@ instructions in the project memory file.
 ### OS-user isolation (`run_as_user`)
 
 On Linux/macOS a project can spawn its agent under a different Unix user, for
-file-system isolation from the supervisor user running cc-connect. Currently
+file-system isolation from the supervisor user running Magpie. Currently
 supported by Claude Code.
 
 ```toml
@@ -289,12 +334,12 @@ sync — see the
 Audit before starting:
 
 ```bash
-cc-connect doctor user-isolation
+magpie doctor user-isolation
 ```
 
 Three go/no-go preflight gates plus an isolation probe reporting what the target
-user can and cannot read. cc-connect refuses to start if a gate fails or the
-probe finds a cross-user leak.
+user can and cannot read. Magpie refuses to start if a gate fails or the probe
+finds a cross-user leak.
 
 
 ## Selective builds
@@ -307,7 +352,7 @@ make build AGENTS=claudecode PLATFORMS_INCLUDE=feishu
 make build AGENTS=claudecode,codex PLATFORMS_INCLUDE=feishu,wecom
 make build EXCLUDE=weixin,wecom
 
-go build -tags 'no_weixin no_wecom' ./cmd/cc-connect   # without Make
+go build -tags 'no_weixin no_wecom' ./cmd/magpie   # without Make
 ```
 
 Available tags: `no_acp`, `no_claudecode`, `no_codex`, `no_copilot`,
@@ -328,6 +373,7 @@ Typed in chat, not in a shell.
 /mode [name]                Show or switch permission mode
 /model [switch <alias>]     List or switch model
 /provider [switch <name>]   List or switch API provider
+/git [subcommand]           Read-only repository queries
 /cron, /timer               Recurring and one-shot scheduled tasks
 /cancel                     Interrupt the current turn
 /whoami, /status            Identity and session state
@@ -354,6 +400,6 @@ Full reference: [docs/usage.md](docs/usage.md).
 [MIT](LICENSE) — use it however you like, commercially included; the only
 condition is keeping the copyright and permission notice.
 
-Upstream [chenhg5/cc-connect](https://github.com/chenhg5/cc-connect) declares MIT
-in `npm/package.json` but ships no `LICENSE` file, so [LICENSE](LICENSE) carries
-both its notice and this fork's.
+Magpie began as a fork of [chenhg5/cc-connect](https://github.com/chenhg5/cc-connect),
+which declares MIT in `npm/package.json` but ships no `LICENSE` file. So
+[LICENSE](LICENSE) carries both that notice and this project's.

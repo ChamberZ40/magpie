@@ -16,6 +16,9 @@ const (
 	progressStyleCard    = "card"
 
 	// ProgressCardPayloadPrefix marks a structured payload for card-style progress.
+	// The literal keeps the pre-rename spelling on purpose: it is an opaque,
+	// version-tagged sentinel, never shown to a user, and changing it would make
+	// payloads already in flight unparseable for no gain.
 	ProgressCardPayloadPrefix = "__cc_connect_progress_card_v1__:"
 
 	// Keep a margin below platform hard limit for markdown wrappers/code fences.

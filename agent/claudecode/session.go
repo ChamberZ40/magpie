@@ -19,7 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/appid"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 // claudeSession manages a long-running Claude Code process using
@@ -68,7 +69,7 @@ type claudeSession struct {
 	// promptFilePath is the per-spawn temp file holding the merged
 	// content for --append-system-prompt-file when this session needs
 	// platform- or user-specific append text that the shared
-	// cc-connect-system.md cannot represent. Removed on Close. Empty
+	// magpie-system.md cannot represent. Removed on Close. Empty
 	// when the session reuses the shared file (the common 99% case)
 	// or when there is nothing to append.
 	promptFilePath string
@@ -80,20 +81,20 @@ type claudeSession struct {
 func (cs *claudeSession) StartupWarning() string { return cs.startupWarning }
 
 // sharedSystemPromptRelPath is the location under ccDataDir where the
-// shared cc-connect system prompt file lives. Reused across every spawn
+// shared magpie system prompt file lives. Reused across every spawn
 // that doesn't need per-session customization (the 99% case).
-const sharedSystemPromptRelPath = "agent-prompts/cc-connect-system.md"
+const sharedSystemPromptRelPath = "agent-prompts/magpie-system.md"
 
 // ensureSharedSystemPromptFile lazily writes <ccDataDir>/agent-prompts/
-// cc-connect-system.md with the cc-connect default AgentSystemPrompt
+// magpie-system.md with the magpie default AgentSystemPrompt
 // content, returning the path. The file is the workaround for the
-// Windows 8192-byte command-line limit (issue #1376): cc-connect's
+// Windows 8192-byte command-line limit (issue #1376): magpie's
 // built-in prompt is ~9KB on its own, so passing it inline via
 // --append-system-prompt blows past the cap regardless of whether the
 // user configured any customization.
 //
 // The file is only (re)written when missing or when its content differs
-// from the current AgentSystemPrompt() — this lets cc-connect upgrades
+// from the current AgentSystemPrompt() — this lets magpie upgrades
 // refresh the prompt automatically without per-spawn overhead. claude
 // only reads the file at startup and never writes it, so there is no
 // concurrent-write race even when multiple sessions spawn at once.
@@ -137,7 +138,7 @@ func writeTempAppendPromptFile(ccDataDir, content string) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	f, err := os.CreateTemp(dir, "cc-connect-system-*.md")
+	f, err := os.CreateTemp(dir, "magpie-system-*.md")
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +147,7 @@ func writeTempAppendPromptFile(ccDataDir, content string) (string, error) {
 		_ = os.Remove(f.Name())
 		return "", err
 	}
-	// os.CreateTemp defaults to mode 0600 owned by the cc-connect process
+	// os.CreateTemp defaults to mode 0600 owned by the magpie process
 	// user (often root when launched by systemd). When the agent is spawned
 	// under run_as_user, the target user is different and gets EACCES on
 	// 0600 root-owned files (issue #1429). The shared prompt file already
@@ -170,7 +171,7 @@ func writeTempAppendPromptFile(ccDataDir, content string) (string, error) {
 // next spawn would mistake for valid content.
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
-	f, err := os.CreateTemp(dir, ".cc-connect-system-*.tmp")
+	f, err := os.CreateTemp(dir, ".magpie-system-*.tmp")
 	if err != nil {
 		return err
 	}
@@ -196,7 +197,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
-// buildAppendSystemPrompt concatenates the cc-connect functionality prompt,
+// buildAppendSystemPrompt concatenates the magpie functionality prompt,
 // platform formatting instructions, and the user's custom append prompt into
 // the single string passed to Claude's --append-system-prompt-file flag.
 // That flag only honors its last occurrence (a second flag overwrites the
@@ -220,7 +221,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	sessionCtx, cancel := context.WithCancel(ctx)
 
 	// Claude Code rejects bypassPermissions when running as root.
-	// Downgrade to "auto" which auto-approves internally in cc-connect.
+	// Downgrade to "auto" which auto-approves internally in magpie.
 	var rootDowngradeWarning string
 	if mode == "bypassPermissions" && os.Geteuid() == 0 {
 		slog.Warn("claudeSession: bypassPermissions not allowed under root, downgrading to auto mode")
@@ -248,7 +249,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	case "", core.ContinueSession:
 		// Truly fresh session — no resume, no continue.
 	default:
-		// Resuming a known session ID — this is cc-connect's own session
+		// Resuming a known session ID — this is magpie's own session
 		// from a previous connection, safe to resume directly.
 		innerArgs = append(innerArgs, "--resume", sessionID)
 	}
@@ -269,7 +270,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 		innerArgs = append(innerArgs, "--system-prompt", systemPrompt)
 	}
 
-	// Append the cc-connect functionality prompt, platform formatting hints,
+	// Append the magpie functionality prompt, platform formatting hints,
 	// and the user's custom append prompt — via Claude's
 	// --append-system-prompt-file flag (not --append-system-prompt). Writing
 	// to a file avoids the Windows 8192-byte command-line limit (#1376):
@@ -278,7 +279,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	//
 	// Two paths exist to keep the common case zero-overhead:
 	//   • 99% case (no platform formatting, no user append) — reuse the
-	//     shared cc-connect-system.md file written once at startup; no
+	//     shared magpie-system.md file written once at startup; no
 	//     per-spawn write, no cleanup needed.
 	//   • 1% edge case (Slack/Weixin/MAX platform formatting or user-set
 	//     append_system_prompt) — write a per-spawn temp file containing
@@ -368,18 +369,18 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	// 100% CPU after their parent's stdio pipe closes.
 	prepareCmdForKill(cmd)
 	// Filter out CLAUDECODE env var to prevent "nested session" detection,
-	// since cc-connect is a bridge, not a nested Claude Code session.
+	// since magpie is a bridge, not a nested Claude Code session.
 	env := filterEnv(os.Environ(), "CLAUDECODE")
 	if len(extraEnv) > 0 {
 		env = core.MergeEnv(env, extraEnv)
 	}
 	// Signal to PermissionRequest hooks that they are running inside
-	// cc-connect. Hooks can check this env var to skip LLM calls on
+	// magpie. Hooks can check this env var to skip LLM calls on
 	// the Claude Code side (the hook result is ignored anyway when
-	// --permission-prompt-tool stdio is active). cc-connect runs the
+	// --permission-prompt-tool stdio is active). magpie runs the
 	// hook itself without this env var, so the real work happens only
 	// once.
-	env = core.MergeEnv(env, []string{"CC_CONNECT_PERMISSION_HOOK_SKIP=1"})
+	env = core.MergeEnv(env, []string{"MAGPIE_PERMISSION_HOOK_SKIP=1"})
 	// Carry the intended working directory across the sudo -i boundary so the
 	// re-chdir wrapper in BuildSpawnCommand can restore it (sudo -i would
 	// otherwise leave the agent in the target user's HOME). Only meaningful
@@ -390,7 +391,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	}
 	// When run_as_user is set, strip the supervisor's environment down to
 	// the allowlist before passing it to sudo. sudo --preserve-env also
-	// enforces this, but filtering here makes the cc-connect spawn argv
+	// enforces this, but filtering here makes the magpie spawn argv
 	// the single source of truth.
 	env = core.FilterEnvForSpawn(env, spawnOpts)
 	cmd.Env = env
@@ -434,7 +435,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	}
 
 	// Only remember the prompt path for cleanup when it is the per-spawn
-	// temp variant. The shared cc-connect-system.md file is reused across
+	// temp variant. The shared magpie-system.md file is reused across
 	// all sessions and must never be deleted by an individual session's
 	// Close.
 	var cleanupPromptPath string
@@ -952,7 +953,7 @@ func (cs *claudeSession) Send(prompt string, messageID string, images []core.Ima
 		})
 	}
 
-	attachDir := filepath.Join(cs.workDir, ".cc-connect", "attachments")
+	attachDir := filepath.Join(appid.WorkspaceDir(cs.workDir), "attachments")
 	if err := os.MkdirAll(attachDir, 0o755); err != nil {
 		slog.Warn("claudeSession: mkdir attachments failed", "error", err, "path", attachDir)
 	}

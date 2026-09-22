@@ -1,5 +1,5 @@
-# cc-connect configuration
-# cc-connect 配置文件
+# magpie configuration
+# magpie 配置文件
 #
 # Copy this file to config.toml and fill in your credentials.
 # 复制此文件为 config.toml，填入你的凭证信息。
@@ -9,9 +9,9 @@
 # 例如：app_secret = "${FEISHU_APP_SECRET}"
 #
 # Each [[projects]] entry binds one code directory to its own agent + platforms.
-# A single cc-connect process can manage multiple projects simultaneously.
+# A single magpie process can manage multiple projects simultaneously.
 # 每个 [[projects]] 将一个代码目录绑定到独立的 agent 和平台。
-# 单个 cc-connect 进程可以同时管理多个项目。
+# 单个 magpie 进程可以同时管理多个项目。
 
 # =============================================================================
 # Global Settings / 全局设置
@@ -34,26 +34,26 @@
 # 初始化命令，会添加到每条 shell 命令前面。用于加载 profile，使自定义函数和别名可用。
 # shell_profile = "source ~/.zshrc"
 
-# Session data storage directory (default: ~/.cc-connect)
+# Session data storage directory (default: ~/.magpie)
 # Stores conversation history and session state as JSON files.
-# 会话数据存储目录（默认 ~/.cc-connect），以 JSON 文件保存对话历史和会话状态。
+# 会话数据存储目录（默认 ~/.magpie），以 JSON 文件保存对话历史和会话状态。
 # data_dir = "/path/to/custom/dir"
 
-# Attachment send-back switch for `cc-connect send --image/--file`.
+# Attachment send-back switch for `magpie send --image/--file`.
 # Independent from the agent's /mode. Set to "off" to block IM image/file send-back.
-# `cc-connect send --message` without attachments is unaffected.
-# 附件回传开关，用于控制 `cc-connect send --image/--file`。
+# `magpie send --message` without attachments is unaffected.
+# 附件回传开关，用于控制 `magpie send --image/--file`。
 # 它与 agent 的 /mode 独立；设为 "off" 会禁用通过 IM 回传图片/文件。
-# 不带附件的 `cc-connect send --message` 不受影响。
+# 不带附件的 `magpie send --message` 不受影响。
 # attachment_send = "on"
 
-# Maximum size of a single attachment (in MiB) for `cc-connect send
+# Maximum size of a single attachment (in MiB) for `magpie send
 # --file/--image/--audio/--video` and the /send API. Default: 50 (i.e. 50 MiB).
 # Set 0 to keep the default. Raise it to send larger files; the /send request
 # body limit scales with this value to fit base64-encoded attachments.
 # Can also be overridden by the CC_MAX_ATTACHMENT_SIZE_MB env var (same MiB
 # unit; takes precedence over this option when set).
-# `cc-connect send` 单个附件的最大大小（单位 MiB）。默认 50（即 50 MiB），设 0 保持默认。
+# `magpie send` 单个附件的最大大小（单位 MiB）。默认 50（即 50 MiB），设 0 保持默认。
 # 调大可发送更大文件；/send 请求体上限会随之按 base64 膨胀自动放大。
 # 也可用环境变量 CC_MAX_ATTACHMENT_SIZE_MB 覆盖（同样单位 MiB；设置后优先级高于本配置项）。
 # max_attachment_size_mb = 50
@@ -72,10 +72,10 @@ level = "info" # debug, info, warn, error
 # Remote presets URL (fetches the recommended providers list at runtime)
 # 远程预设列表 URL（运行时拉取推荐服务商列表）
 # Defaults to this fork's copy. Pointing this at upstream also re-pulls upstream's
-# per-provider referral codes and "cc-connect exclusive discount" copy.
-# 默认指向本 fork 的副本。指回上游会连带把各家服务商的推广码和「cc-connect 用户专享折扣」
+# per-provider referral codes and "magpie exclusive discount" copy.
+# 默认指向本 fork 的副本。指回上游会连带把各家服务商的推广码和「magpie 用户专享折扣」
 # 文案一起拉回来。
-# provider_presets_url = "https://raw.githubusercontent.com/ChamberZ40/Mac-connect/main/provider-presets.json"
+# provider_presets_url = "https://raw.githubusercontent.com/ChamberZ40/magpie/main/provider-presets.json"
 
 # [[providers]]
 # name = "anthropic"
@@ -131,7 +131,7 @@ level = "info" # debug, info, warn, error
 #                                # 在助手回复底部显示类似 Codex 的状态行（默认 true 显示）
 #                                # On rich cards the footer renders as up to two dim lines:
 #                                #   ⏱ 用时 4 分 50 秒 · 🧠 claude-opus-5 · ctx ▰▰▰▰▱▱▱▱▱▱43%
-#                                #   📁 ~/code/cc-connect · ⎇ main
+#                                #   📁 ~/code/magpie · ⎇ main
 #                                # 富卡片下 footer 渲染为最多两行小字：第 1 行是「这一轮做了什么」
 #                                # ——耗时、模型、上下文进度条；第 2 行是「在哪里做的」——工作目录
 #                                # 与当前 git 分支。模型及之后各段受 show_context_indicator 控制，
@@ -178,7 +178,7 @@ level = "info" # debug, info, warn, error
 
 # Auto-reset the active session after the user has been inactive for a while.
 # Unlike idle_timeout_mins, this does not detect stuck agent execution. It
-# rotates to a fresh cc-connect session when the user comes back after being idle.
+# rotates to a fresh magpie session when the user comes back after being idle.
 # This avoids "context drift", where stale chat history (failed commands,
 # debugging noise, abandoned tangents) gets re-ingested via --continue every
 # time the workspace pool evicts the session, and starts to dominate the model's
@@ -194,14 +194,14 @@ level = "info" # debug, info, warn, error
 # reset_on_idle_mins = 30   # default when unset / 未设置时的默认值；设为 0 表示禁用
 
 # Close an idle live agent process after a clean turn while preserving the
-# cc-connect session and saved agent session ID. The next message in the same
+# magpie session and saved agent session ID. The next message in the same
 # chat/thread starts a new agent process and resumes the same conversation.
 # This is per chat session/thread, unlike workspace_idle_timeout_mins which
 # reaps an entire workspace. Set to 0 or leave unset to disable.
 # Unlike reset_on_idle_mins, this defaults to disabled because closing a live
 # agent process is an opt-in resource optimization.
 # 在单次对话正常完成后，如果该聊天会话/主题长时间没有新消息，则关闭对应的 live agent
-# 进程，但保留 cc-connect 会话和已保存的 agent_session_id。下次同一会话有消息时会
+# 进程，但保留 magpie 会话和已保存的 agent_session_id。下次同一会话有消息时会
 # 重新启动 agent 进程并续接原会话。这是按会话/主题生效，不同于按 workspace 回收的
 # workspace_idle_timeout_mins。设为 0 或不设置表示禁用。
 # 与 reset_on_idle_mins 不同，此项默认禁用，因为关闭 live agent 进程属于显式开启的资源优化。
@@ -215,7 +215,7 @@ level = "info" # debug, info, warn, error
 #
 # Spawn a project's agent command under a different Unix user via
 # `sudo -n -iu <user>`. This provides OS-level file-system isolation from
-# the supervisor user that runs cc-connect itself, so a misbehaving agent
+# the supervisor user that runs magpie itself, so a misbehaving agent
 # cannot read files outside the target user's permission scope.
 #
 # Currently supported by: claudecode.
@@ -228,15 +228,15 @@ level = "info" # debug, info, warn, error
 #        # install claude CLI, set up ~/.claude/settings.json, PGSSL certs,
 #        # ~/.pgpass, plugin state, anything the agent needs.
 #   2. Grant the supervisor user passwordless sudo to the target:
-#        # /etc/sudoers.d/cc-connect
+#        # /etc/sudoers.d/magpie
 #        partseeker-orchestrator ALL=(partseeker-coder) NOPASSWD: ALL
 #   3. Ensure the target user does NOT have passwordless sudo to anywhere
 #      else. `sudo -n -iu partseeker-coder -- sudo -n true` must fail.
 #   4. Ensure the target user can read AND write the project's work_dir.
-#   5. Run `cc-connect doctor user-isolation` to audit the setup before
-#      starting cc-connect.
+#   5. Run `magpie doctor user-isolation` to audit the setup before
+#      starting magpie.
 #
-# cc-connect refuses to start if any preflight gate fails (missing sudo,
+# magpie refuses to start if any preflight gate fails (missing sudo,
 # target can escalate, work_dir inaccessible) or if the isolation probe
 # detects that the target user can read another user's secrets.
 #
@@ -317,17 +317,56 @@ level = "info" # debug, info, warn, error
 # =============================================================================
 # Relay Settings / Relay 设置
 # =============================================================================
-# Bot-to-bot relay settings. timeout_secs controls how long cc-connect waits for
-# the target bot to finish responding during `cc-connect relay send`.
+# Bot-to-bot relay settings. timeout_secs controls how long magpie waits for
+# the target bot to finish responding during `magpie relay send`.
 # visibility controls the extra group-chat echo only; the caller still receives
 # the target response from the relay command when visibility is "none".
-# Bot 间 relay 设置。timeout_secs 控制 `cc-connect relay send` 等待目标 bot
+# Bot 间 relay 设置。timeout_secs 控制 `magpie relay send` 等待目标 bot
 # 完成回复的最长时间。visibility 只控制群内额外可见消息；设为 "none" 时调用方
 # 仍会从 relay 命令拿到目标回复。
 
 # [relay]
 # timeout_secs = 120        # Max relay wait in seconds; 0 = disabled (default: 120) / relay 最大等待秒数；0 = 禁用（默认 120）
 # visibility = "full"       # "full" (default), "summary", or "none" / 群内可见消息：完整、摘要或不显示
+
+# =============================================================================
+# Prevent Sleep / 防止休眠
+# =============================================================================
+# The bridge is only reachable while its host is awake: once the machine idle
+# sleeps, the platform connection drops and messages are not delivered until
+# something wakes it. On a laptop with the stock power settings that happens
+# within minutes of you walking away.
+#
+# magpie holds a macOS power assertion (via caffeinate) for as long as it runs,
+# and releases it on shutdown. This is deliberately not a `pmset` change: a
+# global pmset setting would outlive a crash and leave a Mac that never sleeps.
+#
+#   "off"      no assertion; the machine sleeps on its own schedule (default)
+#   "always"   stay awake on battery and on AC
+#   "ac_only"  stay awake only while plugged in
+#
+# Limitations / 限制:
+#   - macOS only. On Linux and Windows a non-"off" value is logged and ignored.
+#   - Closing the lid always sleeps an Apple Silicon laptop (unless it is in
+#     clamshell mode with an external display and power). No software assertion
+#     can prevent that; this setting covers "lid open, left alone".
+#   - Not hot-reloadable: restart the service after changing it.
+#
+# 桥只在宿主机醒着的时候可达：机器一进空闲休眠，平台连接就断，消息要等唤醒后才
+# 送达。笔记本按出厂电源设置，人离开几分钟就会发生。
+#
+# magpie 在运行期间持有一个 macOS power assertion（通过 caffeinate），关停时释放。
+# 这里刻意不改 `pmset`：全局 pmset 设置会在崩溃后继续生效，留下一台再也不睡的 Mac。
+#
+#   "off"      不持有 assertion，机器按自己的节奏休眠（默认）
+#   "always"   电池和交流电下都保持唤醒
+#   "ac_only"  只在插电时保持唤醒
+#
+# 限制：仅 macOS 生效；Apple Silicon 合盖必睡（除接外显和电源的蛤壳模式），本设置
+# 解决的是「开盖放着不动」；改完需要重启服务。
+
+# [power]
+# prevent_sleep = "ac_only"   # "off" (default), "always", or "ac_only" / 三档：关闭、始终、仅插电
 
 # =============================================================================
 # Auto-Compress / 自动压缩
@@ -456,12 +495,12 @@ level = "info" # debug, info, warn, error
 # [[hooks]]
 # event = "error"
 # type = "http"
-# url = "https://my-server.com/cc-connect/on-error"
+# url = "https://my-server.com/magpie/on-error"
 #
 # [[hooks]]
 # event = "*"
 # type = "http"
-# url = "https://my-server.com/cc-connect/events"
+# url = "https://my-server.com/magpie/events"
 
 # =============================================================================
 # Speech-to-Text (Voice Messages) / 语音转文字（语音消息）
@@ -537,15 +576,15 @@ level = "info" # debug, info, warn, error
 # # 备选：MiniMax TTS（T2A v2 流式 API）
 # # Docs: https://platform.minimaxi.com/document/T2A%20V2
 # [tts.minimax]
-# api_key  = "your-minimax-api-key" # optional: if empty, cc-connect reads ~/.cc-connect/config/minimax.json
+# api_key  = "your-minimax-api-key" # optional: if empty, magpie reads ~/.magpie/config/minimax.json
 # base_url = ""              # optional: default "https://api.minimaxi.com" / 留空使用默认地址
 # model    = "speech-2.8-hd" # "speech-2.8-hd" | "speech-2.8"
 # config_file = ""           # optional MiniMax JSON config path; default data_dir/config/minimax.json
 #
 # # Per-project/agent voice overrides. Keys match [[projects]].name.
 # # 每个项目/Agent 可单独覆盖音色；key 与 [[projects]].name 一致。
-# # Agent tool command: cc-connect send --tts <text>
-# # Agent 工具命令：cc-connect send --tts <文本>
+# # Agent tool command: magpie send --tts <text>
+# # Agent 工具命令：magpie send --tts <文本>
 # [tts.agents.assistant]
 # voice_id = "Chinese (Mandarin)_Crisp_Girl"
 # speed = 0.98
@@ -566,10 +605,10 @@ level = "info" # debug, info, warn, error
 # =============================================================================
 # Daemon Mode / 守护进程模式
 # =============================================================================
-# Run cc-connect as a background service (systemd user / launchd LaunchAgent).
-# 将 cc-connect 作为后台服务运行（systemd 用户服务 / launchd LaunchAgent）。
+# Run magpie as a background service (systemd user / launchd LaunchAgent).
+# 将 magpie 作为后台服务运行（systemd 用户服务 / launchd LaunchAgent）。
 #
-# CLI: cc-connect daemon install|uninstall|start|stop|restart|status|logs
+# CLI: magpie daemon install|uninstall|start|stop|restart|status|logs
 # Install: --log-file PATH, --log-max-size N (MB), --work-dir DIR, --force
 # Logs: -f/--follow, -n N, --log-file PATH
 # 配置均通过 CLI 参数，无需在此文件中设置。
@@ -655,9 +694,9 @@ level = "info" # debug, info, warn, error
 #   /commands del finduser
 #   /commands         — list all custom commands
 #
-# In addition, cc-connect auto-discovers .md files from the agent's commands
+# In addition, magpie auto-discovers .md files from the agent's commands
 # directory (e.g. .claude/commands/*.md).
-# 此外，cc-connect 还会自动发现 Agent 的 commands 目录下的 .md 文件。
+# 此外，magpie 还会自动发现 Agent 的 commands 目录下的 .md 文件。
 
 # =============================================================================
 # Banned Words / 违禁词
@@ -751,10 +790,10 @@ name = "my-backend"
 #                                                     # 禁用该项目的指定命令
 #
 # filter_external_sessions: when true, /list /switch /delete only show sessions
-# created by cc-connect, hiding sessions from direct CLI usage in the same work_dir.
+# created by magpie, hiding sessions from direct CLI usage in the same work_dir.
 # Default false = show all sessions from the agent.
 # filter_external_sessions = false
-# filter_external_sessions：为 true 时，/list /switch /delete 仅显示由 cc-connect 创建的会话，
+# filter_external_sessions：为 true 时，/list /switch /delete 仅显示由 magpie 创建的会话，
 # 隐藏在相同 work_dir 下通过直接 CLI 创建的会话。默认 false = 显示 agent 的全部会话。
 #
 # shell = "/bin/fish"                        # Per-project shell override / 项目级 shell 覆盖
@@ -903,8 +942,8 @@ mode = "default" # "default" | "acceptEdits" (edit) | "plan" | "auto" | "bypassP
 # router_url = "http://127.0.0.1:3456"  # Claude Code Router URL (default: http://127.0.0.1:3456)
 # router_api_key = "your-router-api-key" # Optional: API key if router requires authentication / 可选：如果 router 需要认证
 #
-# When router_url is set, cc-connect will automatically:
-# 设置 router_url 后，cc-connect 会自动：
+# When router_url is set, magpie will automatically:
+# 设置 router_url 后，magpie 会自动：
 #   - Set ANTHROPIC_BASE_URL to router_url
 #   - Set NO_PROXY=127.0.0.1 to prevent proxy interference
 #   - Disable telemetry and cost warnings for cleaner integration
@@ -921,7 +960,7 @@ mode = "default" # "default" | "acceptEdits" (edit) | "plan" | "auto" | "bypassP
 # provider_refs = ["minimaxi", "dashscope"]
 
 # API Providers — switch between them via /provider command in chat
-# or via CLI: cc-connect provider add --project my-backend --name relay --api-key sk-xxx
+# or via CLI: magpie provider add --project my-backend --name relay --api-key sk-xxx
 # API Provider 管理 — 可通过聊天命令 /provider 或 CLI 命令切换
 #
 # [[projects.agent.providers]]
@@ -951,7 +990,7 @@ mode = "default" # "default" | "acceptEdits" (edit) | "plan" | "auto" | "bypassP
 # # Some providers (e.g. SiliconFlow) don't support Claude's adaptive thinking.
 # # Set thinking = "disabled" to auto-rewrite via a local proxy.
 # # 部分第三方 Provider（如硅基流动）不支持 Claude 的 adaptive thinking，
-# # 设置 thinking = "disabled" 后 cc-connect 会通过本地代理自动改写请求。
+# # 设置 thinking = "disabled" 后 magpie 会通过本地代理自动改写请求。
 # [[projects.agent.providers]]
 # name = "siliconflow"
 # api_key = "sk-xxx"
@@ -995,10 +1034,10 @@ mode = "default" # "default" | "acceptEdits" (edit) | "plan" | "auto" | "bypassP
 # thinking = "disabled"
 
 # Reference normalization and rendering / 本地引用标准化与展示优化
-# Disabled by default. When enabled, cc-connect can normalize Codex / Claude Code
+# Disabled by default. When enabled, magpie can normalize Codex / Claude Code
 # local file references (paths, line refs, markdown file links) and re-render them
 # into a more readable platform-friendly form before sending to supported IMs.
-# 默认关闭。启用后，cc-connect 可对 Codex / Claude Code 的本地文件引用
+# 默认关闭。启用后，magpie 可对 Codex / Claude Code 的本地文件引用
 # （路径、行号引用、Markdown 文件链接）做标准化，并在发送到支持的平台前
 # 重新渲染为更易读的展示形式。
 #
@@ -1023,8 +1062,8 @@ mode = "default" # "default" | "acceptEdits" (edit) | "plan" | "auto" | "bypassP
 #    添加 im.message.receive_v1 事件，选择 WebSocket 长连接模式
 # 4. Fill in app_id and app_secret below / 填入下方 app_id 和 app_secret
 # Quick setup via CLI:
-#   cc-connect feishu setup --project <project_name>
-# （可通过 CLI 快速配置：cc-connect feishu setup --project <project_name>）
+#   magpie feishu setup --project <project_name>
+# （可通过 CLI 快速配置：magpie feishu setup --project <project_name>）
 # Note: No WebSocket URL needed — the SDK auto-negotiates the connection.
 # 注意：无需配置 WebSocket URL，SDK 会自动通过凭证建立连接。
 
@@ -1068,12 +1107,12 @@ app_secret = "your-feishu-app-secret"
 #                           # 优先级高于 resolve_mentions 的群成员匹配；需同时开启 resolve_mentions = true。
 # image_batch_window_ms = 500  # Coalesce window for consecutive images from the same session (default: 500ms).
 #                              # When the Feishu mobile client sends multiple images, each arrives as a separate
-#                              # event; cc-connect buffers them and dispatches a single multi-image message once
+#                              # event; magpie buffers them and dispatches a single multi-image message once
 #                              # no new image arrives within this window. Raise it (e.g. 800–1200ms) if your
 #                              # network or device routinely sends images more than 500ms apart and they still
 #                              # split into multiple agent turns; lower it for snappier single-image responses.
 #                              # 来自同一会话的连续图片消息的合批窗口（默认 500ms）。飞书手机端连续发图时每张
-#                              # 都是独立事件，cc-connect 会在窗口内将它们合并成一条多图消息再分发；如果你的
+#                              # 都是独立事件，magpie 会在窗口内将它们合并成一条多图消息再分发；如果你的
 #                              # 网络或设备发送间隔超过 500ms 且仍被拆成多轮，可调高（如 800–1200ms）；如果
 #                              # 只是单图发送，希望响应更快，也可以适当调低。
 
@@ -1115,8 +1154,8 @@ app_secret = "your-feishu-app-secret"
 #    URL: http(s)://<your-domain>:<port>/wecom/callback
 #    Token: any random string / 任意随机字符串
 #    EncodingAESKey: click "Random Generate" (43 chars) / 点击"随机生成"（43位）
-#    (Start cc-connect FIRST, then save to pass verification)
-#    （先启动 cc-connect，再保存以通过验证）
+#    (Start magpie FIRST, then save to pass verification)
+#    （先启动 magpie，再保存以通过验证）
 # 5. App > Trusted IP > add your server's outbound IP
 #    应用 > 企业可信 IP > 添加服务器出口 IP
 # 6. (Optional) My Enterprise > WeChat Plugin > scan QR to link personal WeChat
@@ -1172,8 +1211,8 @@ app_secret = "your-feishu-app-secret"
 # Same HTTP API as OpenClaw @tencent-weixin/openclaw-weixin: long-poll getUpdates + sendMessage.
 # 与 OpenClaw 插件 openclaw-weixin 使用同一套网关：长轮询收消息 + sendMessage 下发。
 #
-# 1. Easiest: run `cc-connect weixin setup --project <name>` — terminal shows a QR; scan with WeChat to obtain token.
-#    Or: `cc-connect weixin bind --project <name> --token <bearer>` if you already have a token (e.g. from OpenClaw).
+# 1. Easiest: run `magpie weixin setup --project <name>` — terminal shows a QR; scan with WeChat to obtain token.
+#    Or: `magpie weixin bind --project <name> --token <bearer>` if you already have a token (e.g. from OpenClaw).
 # 2. Manual: set token below. Optional: base_url (default https://ilinkai.weixin.qq.com).
 # 3. allow_from: comma-separated Weixin user IDs (e.g. user@im.wechat) or "*".
 # State files (get_updates cursor + context_token cache) live under:
@@ -1279,10 +1318,10 @@ app_secret = "your-feishu-app-secret"
 # reasoning_effort = "high"  # "minimal" | "low" | "medium" | "high" | "xhigh"
 #
 # Optional: project system prompt / 可选：项目系统提示
-# Codex has no native system-prompt flag, so cc-connect injects this as a
+# Codex has no native system-prompt flag, so magpie injects this as a
 # preamble prepended to your first message of each new session (resumed
 # sessions are not re-injected).
-# Codex 没有原生的系统提示参数，cc-connect 会将其作为前导内容注入到每个新
+# Codex 没有原生的系统提示参数，magpie 会将其作为前导内容注入到每个新
 # 会话的第一条消息之前（恢复的会话不会重复注入）。
 # system_prompt = "You are a helpful AI assistant that specializes in Python development."
 #
@@ -1347,7 +1386,7 @@ app_secret = "your-feishu-app-secret"
 
 # --- Example: OpenClaw (Gateway-backed ACP bridge) ---
 # Docs: https://docs.openclaw.ai/cli/acp
-# Install the OpenClaw CLI, run a Gateway, then point cc-connect at `openclaw acp`.
+# Install the OpenClaw CLI, run a Gateway, then point magpie at `openclaw acp`.
 #
 # IMPORTANT: Remote OpenClaw requires pairing authorization before use!
 #
@@ -1355,7 +1394,7 @@ app_secret = "your-feishu-app-secret"
 #   1. Start OpenClaw gateway: openclaw acp --url wss://your-gateway:18789
 #   2. In another terminal, run: openclaw pair
 #   3. Approve the pairing request in the OpenClaw UI
-#   4. Now cc-connect can communicate with the authorized gateway
+#   4. Now magpie can communicate with the authorized gateway
 #
 # Without pairing, OpenClaw will return empty responses ("pairing required" error).
 # Reference: https://zhuanlan.zhihu.com/p/2005687480976970296
@@ -1437,7 +1476,7 @@ app_secret = "your-feishu-app-secret"
 # GitHub Copilot CLI uses --headless --stdio for JSON-RPC communication.
 # GitHub Copilot CLI 使用 --headless --stdio 进行 JSON-RPC 通信。
 # The generic ACP configuration above is also supported; this first-class agent
-# adds cc-connect model/mode switching plus session list/delete integration.
+# adds magpie model/mode switching plus session list/delete integration.
 
 # [[projects]]
 # name = "my-copilot-project"

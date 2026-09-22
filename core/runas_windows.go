@@ -6,11 +6,13 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 // RunAsChdirEnv is unused on Windows (run_as_user is not supported) but is
 // defined so cross-platform callers referencing core.RunAsChdirEnv compile.
-const RunAsChdirEnv = "CC_RUNAS_CHDIR"
+const RunAsChdirEnv = appid.EnvPrefix + "RUNAS_CHDIR"
 
 // DefaultEnvAllowlist is a stub on Windows — run_as_user is not supported.
 var DefaultEnvAllowlist = []string{}

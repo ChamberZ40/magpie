@@ -1,6 +1,6 @@
 # 使用指南
 
-cc-connect 完整功能使用指南。
+magpie 完整功能使用指南。
 
 ## 目录
 
@@ -174,10 +174,10 @@ env = { CLAUDE_CODE_USE_BEDROCK = "1", AWS_PROFILE = "bedrock" }
 ### CLI 命令
 
 ```bash
-cc-connect provider add --project my-backend --name relay --api-key sk-xxx --base-url https://api.relay.com
-cc-connect provider list --project my-backend
-cc-connect provider remove --project my-backend --name relay
-cc-connect provider import --project my-backend  # 从 cc-switch 导入
+magpie provider add --project my-backend --name relay --api-key sk-xxx --base-url https://api.relay.com
+magpie provider list --project my-backend
+magpie provider remove --project my-backend --name relay
+magpie provider import --project my-backend  # 从 cc-switch 导入
 ```
 
 ### 聊天命令
@@ -260,7 +260,7 @@ alias = "spark"
 - 不要把 `admin_from` 写到 `[projects.platforms.options]` 里，否则会被忽略。
 - 可先发送 `/whoami` 或 `/status` 获取当前 `User ID`，再把这个 ID 填到 `admin_from`。
 - 如果是个人单人使用，也可以设置 `admin_from = "*"`，但这会让所有已允许用户都拥有特权命令权限。
-- 修改 `config.toml` 后，需要重启 `cc-connect`。
+- 修改 `config.toml` 后，需要重启 `magpie`。
 - 目录切换会作用于当前项目的下一次会话。
 - 相对路径基于当前 Agent 工作目录解析。
 - 目录历史按项目隔离，可通过序号快速切换。
@@ -434,12 +434,12 @@ enclosure_style = "code"
 
 ```bash
 # 推荐：统一入口
-cc-connect feishu setup --project my-project
-cc-connect feishu setup --project my-project --app cli_xxx:sec_xxx
+magpie feishu setup --project my-project
+magpie feishu setup --project my-project --app cli_xxx:sec_xxx
 
 # 强制模式（一般不需要）
-cc-connect feishu new --project my-project
-cc-connect feishu bind --project my-project --app cli_xxx:sec_xxx
+magpie feishu new --project my-project
+magpie feishu bind --project my-project --app cli_xxx:sec_xxx
 ```
 
 区别说明：
@@ -465,14 +465,14 @@ cc-connect feishu bind --project my-project --app cli_xxx:sec_xxx
 
 ```bash
 # 推荐：终端展示二维码 + URL，微信扫码确认后自动写配置
-cc-connect weixin setup --project my-project
+magpie weixin setup --project my-project
 
 # 已有 Bearer Token（例如从 OpenClaw 导出）
-cc-connect weixin bind --project my-project --token '<token>'
-cc-connect weixin setup --project my-project --token '<token>'
+magpie weixin bind --project my-project --token '<token>'
+magpie weixin setup --project my-project --token '<token>'
 
 # 强制只走扫码（不接受 --token）
-cc-connect weixin new --project my-project
+magpie weixin new --project my-project
 ```
 
 区别说明：
@@ -489,7 +489,7 @@ cc-connect weixin new --project my-project
 - 绑定时默认调用 `getUpdates` 校验 Token；可用 `--skip-verify` 跳过。
 - 首次使用后请在微信里 **先发一条消息**，以便缓存 `context_token`，否则可能无法回复。
 
-常用参数：`--api-url`、`--cdn-url`、`--timeout`、`--qr-image`、`--route-tag`、`--bot-type`、`--debug`（详见 `cc-connect weixin help` 或 [weixin.md](./weixin.md)）。
+常用参数：`--api-url`、`--cdn-url`、`--timeout`、`--qr-image`、`--route-tag`、`--bot-type`、`--debug`（详见 `magpie weixin help` 或 [weixin.md](./weixin.md)）。
 
 ---
 
@@ -523,7 +523,7 @@ cc-connect weixin new --project my-project
 
 3. 启动：`ccr start`
 
-4. 配置 cc-connect：
+4. 配置 magpie：
 ```toml
 [projects.agent.options]
 router_url = "http://127.0.0.1:3456"
@@ -534,16 +534,16 @@ router_api_key = "your-secret-key"
 
 ## Claude Code PermissionRequest Hooks
 
-如果你在 Claude Code 的 `settings.json` 中配置了 [PermissionRequest hooks](https://docs.anthropic.com/en/docs/claude-code/hooks)，cc-connect 会读取并执行它们——匹配的 hook 可以在请求到达消息平台之前自动批准或拒绝。
+如果你在 Claude Code 的 `settings.json` 中配置了 [PermissionRequest hooks](https://docs.anthropic.com/en/docs/claude-code/hooks)，magpie 会读取并执行它们——匹配的 hook 可以在请求到达消息平台之前自动批准或拒绝。
 
 ### 为什么 hook 会被执行两次
 
-cc-connect 使用 `--permission-prompt-tool stdio` 模式启动 Claude Code，这意味着 Claude Code 自身执行 hook 的输出会被丢弃（stdout 被协议占用）。为了让你的 hook 真正生效，cc-connect 会从 `settings.json` 中读取 hook 定义，然后**独立重新执行一次**。
+magpie 使用 `--permission-prompt-tool stdio` 模式启动 Claude Code，这意味着 Claude Code 自身执行 hook 的输出会被丢弃（stdout 被协议占用）。为了让你的 hook 真正生效，magpie 会从 `settings.json` 中读取 hook 定义，然后**独立重新执行一次**。
 
 也就是说，每次权限请求你的 hook 命令会被执行**两次**：
 
 1. Claude Code 执行一次（结果丢弃）
-2. cc-connect 执行一次（结果生效）
+2. magpie 执行一次（结果生效）
 
 ### LLM 类 hook 如何避免重复消耗
 
@@ -552,12 +552,12 @@ cc-connect 使用 `--permission-prompt-tool stdio` 模式启动 Claude Code，�
 ```bash
 #!/bin/bash
 if [ -n "$CC_CONNECT_PERMISSION_HOOK_SKIP" ]; then
-  exit 0  # cc-connect 会在不含此变量的环境下重新执行我们
+  exit 0  # magpie 会在不含此变量的环境下重新执行我们
 fi
 # ... 你的 hook 逻辑 ...
 ```
 
-cc-connect 启动 Claude Code 子进程时会在环境中设置 `CC_CONNECT_PERMISSION_HOOK_SKIP=1`。当你的 hook 检测到这个变量时，说明它运行在 Claude Code 内部（结果会被丢弃）——跳过昂贵的逻辑即可。cc-connect 在自己执行 hook 时会剥离这个变量，所以第二次执行会正常运行。
+magpie 启动 Claude Code 子进程时会在环境中设置 `CC_CONNECT_PERMISSION_HOOK_SKIP=1`。当你的 hook 检测到这个变量时，说明它运行在 Claude Code 内部（结果会被丢弃）——跳过昂贵的逻辑即可。magpie 在自己执行 hook 时会剥离这个变量，所以第二次执行会正常运行。
 
 ---
 
@@ -641,7 +641,7 @@ speed = 0.96
 
 ## 图片、文件与语音回传
 
-当 Agent 在本地生成了图片、PDF、日志包、报表等文件，需要把结果直接发回当前聊天时，可以使用 `cc-connect send` 的附件模式。用户明确要求“发语音”时，Agent 也可以用同一个 CLI 走 TTS 合成并发送语音。
+当 Agent 在本地生成了图片、PDF、日志包、报表等文件，需要把结果直接发回当前聊天时，可以使用 `magpie send` 的附件模式。用户明确要求“发语音”时，Agent 也可以用同一个 CLI 走 TTS 合成并发送语音。
 
 **当前支持平台：**
 - 飞书
@@ -660,10 +660,10 @@ speed = 0.96
 /cron setup
 ```
 
-这两个命令写入的是同一份 cc-connect 指令。执行任意一个即可。这样 Agent 才会知道：
+这两个命令写入的是同一份 magpie 指令。执行任意一个即可。这样 Agent 才会知道：
 - 普通文本回复直接正常输出
-- 生成附件后用 `cc-connect send --image/--file` 回传
-- 用户要求语音时用 `cc-connect send --tts` 回传
+- 生成附件后用 `magpie send --image/--file` 回传
+- 用户要求语音时用 `magpie send --tts` 回传
 
 如果你以前已经执行过 setup，也建议升级后重新执行一次，以刷新到最新指令。
 
@@ -675,15 +675,15 @@ speed = 0.96
 attachment_send = "off"
 ```
 
-默认值是 `on`。这个开关与 agent 的 `/mode` 独立，只影响 `cc-connect send --image/--file` 这条图片/文件回传路径。TTS 语音回传走 `[tts]` provider 配置，由 TTS 是否可用决定。
+默认值是 `on`。这个开关与 agent 的 `/mode` 独立，只影响 `magpie send --image/--file` 这条图片/文件回传路径。TTS 语音回传走 `[tts]` provider 配置，由 TTS 是否可用决定。
 
 ### CLI 用法
 
 ```bash
-cc-connect send --image /absolute/path/to/chart.png
-cc-connect send --file /absolute/path/to/report.pdf
-cc-connect send --file /absolute/path/to/report.pdf --image /absolute/path/to/chart.png
-cc-connect send --tts "你好"
+magpie send --image /absolute/path/to/chart.png
+magpie send --file /absolute/path/to/report.pdf
+magpie send --file /absolute/path/to/report.pdf --image /absolute/path/to/chart.png
+magpie send --tts "你好"
 ```
 
 说明：
@@ -694,7 +694,7 @@ cc-connect send --tts "你好"
 - `--image` 和 `--file` 都可以重复多次。
 - 建议使用绝对路径，避免 Agent 当前工作目录变化导致找不到文件。
 - 如果设置了 `attachment_send = "off"`，图片/文件回传会被拒绝，但普通文本回复仍然正常。
-- 每个附件默认上限 **50 MiB**。可在 config.toml 用 `max_attachment_size_mb`（单位 MiB）调整，或用环境变量 `CC_MAX_ATTACHMENT_SIZE_MB` 覆盖该值（同样单位 MiB，设置后优先级更高），例如 `CC_MAX_ATTACHMENT_SIZE_MB=100 cc-connect send --file big.bin`。
+- 每个附件默认上限 **50 MiB**。可在 config.toml 用 `max_attachment_size_mb`（单位 MiB）调整，或用环境变量 `CC_MAX_ATTACHMENT_SIZE_MB` 覆盖该值（同样单位 MiB，设置后优先级更高），例如 `CC_MAX_ATTACHMENT_SIZE_MB=100 magpie send --file big.bin`。
 
 ### 典型场景
 
@@ -708,7 +708,7 @@ cc-connect send --tts "你好"
 - 这个命令是给“附件和语音回传”用的，不要拿它代替普通文本回复。
 - 只能发送本机上 Agent 可访问到的文件。
 - 必须存在活跃会话；如果当前项目没有活动聊天上下文，命令会失败。
-- 目标平台在投递时还会校验自己的文件大小/类型上限；实际生效的是它与 `max_attachment_size_mb` 中**更小**的那个（通过了 cc-connect 的文件仍可能在投递时被平台拒绝）。
+- 目标平台在投递时还会校验自己的文件大小/类型上限；实际生效的是它与 `max_attachment_size_mb` 中**更小**的那个（通过了 magpie 的文件仍可能在投递时被平台拒绝）。
 
 ---
 
@@ -734,11 +734,11 @@ cc-connect send --tts "你好"
 ### CLI 命令
 
 ```bash
-cc-connect cron add --cron "0 6 * * *" --prompt "总结 GitHub trending" --desc "每日趋势"
-cc-connect cron list
-cc-connect cron edit <job-id> <field> <value>   # 可改 cron_expr / prompt / enabled / mute / timeout_mins 等
-cc-connect cron exec <job-id>
-cc-connect cron del <job-id>
+magpie cron add --cron "0 6 * * *" --prompt "总结 GitHub trending" --desc "每日趋势"
+magpie cron list
+magpie cron edit <job-id> <field> <value>   # 可改 cron_expr / prompt / enabled / mute / timeout_mins 等
+magpie cron exec <job-id>
+magpie cron del <job-id>
 ```
 
 可选：`--session-mode new-per-run` 每次触发使用新的 agent 会话（默认 `reuse` 与旧行为一致）。`--timeout-mins N` 设置单次调度最长等待分钟数（`0` 表示不限制；省略为 30 分钟）。
@@ -753,7 +753,7 @@ Claude Code 会自动创建定时任务。对依赖记忆文件的其他 Agent�
 
 ## Shell 配置
 
-默认情况下，cc-connect 在 Unix 上使用 `sh`，Windows 上使用 `powershell.exe` 来执行所有 shell 命令（`/shell`、cron exec、hooks 和 webhook exec）。你可以配置使用其他 shell。
+默认情况下，magpie 在 Unix 上使用 `sh`，Windows 上使用 `powershell.exe` 来执行所有 shell 命令（`/shell`、cron exec、hooks 和 webhook exec）。你可以配置使用其他 shell。
 
 ### 支持的 Shell
 
@@ -814,7 +814,7 @@ shell_profile = "source ~/.config/fish/config.fish"
 
 ### 影响范围
 
-Shell 配置适用于 cc-connect 中所有命令执行路径：
+Shell 配置适用于 magpie 中所有命令执行路径：
 
 - **`/shell` 命令** — 聊天中的交互式 shell 命令
 - **Cron exec 任务** — `[[cron]]` 中 `exec` 字段的定时任务
@@ -839,7 +839,7 @@ Shell 配置适用于 cc-connect 中所有命令执行路径：
 ### 机器人间通信
 
 ```bash
-cc-connect relay send --to codex "你觉得这个架构怎么样？"
+magpie relay send --to codex "你觉得这个架构怎么样？"
 ```
 
 ---
@@ -849,13 +849,13 @@ cc-connect relay send --to codex "你觉得这个架构怎么样？"
 后台服务运行。
 
 ```bash
-cc-connect daemon install --config ~/.cc-connect/config.toml
-cc-connect daemon start
-cc-connect daemon stop
-cc-connect daemon restart
-cc-connect daemon status
-cc-connect daemon logs [-f]
-cc-connect daemon uninstall
+magpie daemon install --config ~/.magpie/config.toml
+magpie daemon start
+magpie daemon stop
+magpie daemon restart
+magpie daemon status
+magpie daemon logs [-f]
+magpie daemon uninstall
 ```
 
 ---
@@ -929,7 +929,7 @@ token = "your-secret-token"     # 登录 token；/web setup 会自动生成
 cors_origins = ["*"]            # 允许的 CORS 来源；留空则不设置 CORS 头
 ```
 
-然后重启 cc-connect。
+然后重启 magpie。
 
 ### 构建选项
 
@@ -938,7 +938,7 @@ Web 前端资源默认编译进二进制。如果想排除（减小约 1MB）：
 ```bash
 make build-noweb
 # 或
-go build -tags 'no_web' ./cmd/cc-connect
+go build -tags 'no_web' ./cmd/magpie
 ```
 
 使用 `no_web` 构建时，`/web` 命令会提示 Web 管理后台不可用。
@@ -954,7 +954,7 @@ API 与 Web UI 共用同一端口。基础 URL：`http://<host>:<port>/api/v1`
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `GET` | `/api/v1/status` | 系统状态（版本、运行时间、已连接平台） |
-| `POST` | `/api/v1/restart` | 重启 cc-connect |
+| `POST` | `/api/v1/restart` | 重启 magpie |
 | `POST` | `/api/v1/reload` | 重新加载配置 |
 | `GET` | `/api/v1/projects` | 项目列表 |
 | `GET` | `/api/v1/sessions?project=<name>` | 查询项目的会话列表 |
@@ -970,7 +970,7 @@ API 与 Web UI 共用同一端口。基础 URL：`http://<host>:<port>/api/v1`
 
 > **状态：Beta。** 此功能自 v1.2.2-beta.5 起可用，协议在后续版本中可能调整。
 
-Bridge 提供 WebSocket + REST 服务，让外部适配器（自定义 UI、机器人、脚本等）可以接入 cc-connect —— 发送消息、接收 Agent 事件、管理会话。
+Bridge 提供 WebSocket + REST 服务，让外部适配器（自定义 UI、机器人、脚本等）可以接入 magpie —— 发送消息、接收 Agent 事件、管理会话。
 
 ### 通过聊天启用
 
@@ -989,7 +989,7 @@ path = "/bridge/ws"             # WebSocket 端点路径
 cors_origins = ["*"]            # 允许的 CORS 来源；留空则不设置 CORS
 ```
 
-然后重启 cc-connect。
+然后重启 magpie。
 
 ### 认证方式
 
@@ -1064,10 +1064,10 @@ type = "feishu"  # 或 wecom, weixin
 下面这些是 issue 区里反复出现、维护者已经回答过的问题。每条都附上了
 原始 issue / PR 链接，方便继续深入。
 
-### cc-connect 是否支持 OpenClaw？(issue #501)
+### magpie 是否支持 OpenClaw？(issue #501)
 
 支持。OpenClaw 通过 [Agent Client Protocol (ACP)](https://agentclientprotocol.com/get-started/agents) 接入。
-cc-connect 内置了 `acp` agent 类型，可以和任何 ACP 兼容的 CLI 通信，
+magpie 内置了 `acp` agent 类型，可以和任何 ACP 兼容的 CLI 通信，
 包括 OpenClaw 的 `openclaw acp` 子命令。
 
 最小配置示例（完整版见 `config.example.toml` 中 `# --- Example:
@@ -1087,14 +1087,14 @@ args = ["acp"]
 display_name = "OpenClaw ACP"
 ```
 
-**远端 Gateway 必须先完成配对授权。** 如果你把 cc-connect 指向
+**远端 Gateway 必须先完成配对授权。** 如果你把 magpie 指向
 远程 OpenClaw Gateway（`args = ["acp", "--url", "wss://..."]`），
 必须先配对，否则所有回复都会是空消息：
 
 1. 启动 Gateway：`openclaw acp --url wss://your-gateway:18789`
 2. 另开终端执行：`openclaw pair`
 3. 在 OpenClaw UI 里同意配对请求
-4. 完成后 cc-connect 才能与已授权的 Gateway 通信
+4. 完成后 magpie 才能与已授权的 Gateway 通信
 
 OpenClaw 回复空消息几乎都是漏掉了配对步骤（issue #432）。在排查其他
 原因之前，先重跑 `openclaw pair` 并在 UI 中重新授权一次。
@@ -1117,9 +1117,9 @@ chat_id = "your_group_chat_id@chatroom"   # 群聊 ID 以 @chatroom 结尾
 
 **获取群聊 ID 的方法：**
 
-1. 启动 cc-connect，并让机器人加入目标群。
+1. 启动 magpie，并让机器人加入目标群。
 2. 让群里任意已知允许的用户在群里发一条消息。
-3. 查看 cc-connect 日志，消息到达时会打印带 `@chatroom` 后缀的
+3. 查看 magpie 日志，消息到达时会打印带 `@chatroom` 后缀的
    `chat_id`。把那个值原样填到 `chat_id` 即可。
 
 把 `chat_id` 留空（或不写这个键）就表示响应机器人所在的所有聊天。

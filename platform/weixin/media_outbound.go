@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 // formatAesKeyForAPI encodes a raw AES key as base64(hex_string),
@@ -155,7 +155,6 @@ func buildVideoMessageItem(ref *cdnUploadedRef) messageItem {
 		},
 	}
 }
-
 
 // SendImage implements core.ImageSender.
 func (p *Platform) SendImage(ctx context.Context, replyCtx any, img core.ImageAttachment) error {

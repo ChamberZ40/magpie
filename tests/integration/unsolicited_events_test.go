@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

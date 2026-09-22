@@ -7,7 +7,7 @@ import (
 // TestNew_ParsesProjectEnvFromOpts verifies that env vars declared under
 // [projects.agent.options.env] in config.toml are loaded into the agent's
 // configEnv field. Without this, user-scoped env (e.g. HTTPS_PROXY in the
-// shell that launched cc-connect) silently overrides the values intended
+// shell that launched magpie) silently overrides the values intended
 // for the codex subprocess.
 //
 // Regression for: codex agent ignoring opts["env"] in factory.
@@ -16,7 +16,7 @@ func TestNew_ParsesProjectEnvFromOpts(t *testing.T) {
 	// to be installed on the test runner.
 	opts := map[string]any{
 		"work_dir": t.TempDir(),
-		"cmd": "go",
+		"cmd":      "go",
 		"env": map[string]string{
 			"HTTPS_PROXY": "http://127.0.0.1:10808",
 			"HTTP_PROXY":  "http://127.0.0.1:10808",
@@ -50,7 +50,7 @@ func TestNew_ParsesProjectEnvFromOpts(t *testing.T) {
 func TestNew_ParsesProjectEnvFromMapStringAny(t *testing.T) {
 	opts := map[string]any{
 		"work_dir": t.TempDir(),
-		"cmd": "go",
+		"cmd":      "go",
 		"env": map[string]any{
 			"OPENAI_BASE_URL": "https://api.example.com/v1",
 			"CUSTOM_FLAG":     "yes",
@@ -80,7 +80,7 @@ func TestNew_ParsesProjectEnvFromMapStringAny(t *testing.T) {
 func TestNew_NoEnvOpts(t *testing.T) {
 	opts := map[string]any{
 		"work_dir": t.TempDir(),
-		"cmd": "go",
+		"cmd":      "go",
 	}
 
 	a, err := New(opts)

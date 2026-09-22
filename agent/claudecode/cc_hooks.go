@@ -43,15 +43,15 @@ type ccHookDecision struct {
 // hookContext carries the session context needed to build hook stdin.
 // Fields mirror Claude Code's PermissionRequest hook input spec.
 type hookContext struct {
-	sessionID          string
-	toolName           string
-	toolInput          map[string]any
-	cwd                string
-	permissionMode     string
-	transcriptPath     string
-	permissionSuggestions []any // nil = omit from stdin
-	agentID            string // empty = omit
-	agentType          string // empty = omit
+	sessionID             string
+	toolName              string
+	toolInput             map[string]any
+	cwd                   string
+	permissionMode        string
+	transcriptPath        string
+	permissionSuggestions []any  // nil = omit from stdin
+	agentID               string // empty = omit
+	agentType             string // empty = omit
 }
 
 // ccPermissionHookRunner reads and executes Claude Code PermissionRequest
@@ -257,9 +257,9 @@ func runHookCommand(
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	// Strip the skip flag so the hook does real work when cc-connect
+	// Strip the skip flag so the hook does real work when magpie
 	// calls it (even if the host environment has it set).
-	cmd.Env = filterEnv(os.Environ(), "CC_CONNECT_PERMISSION_HOOK_SKIP")
+	cmd.Env = filterEnv(os.Environ(), "MAGPIE_PERMISSION_HOOK_SKIP")
 
 	if err := cmd.Run(); err != nil {
 		return ccHookDecision{}, fmt.Errorf("hook exec: %w (stderr: %s)", err, truncateStr(strings.TrimSpace(stderr.String()), 200))

@@ -17,7 +17,7 @@ import (
 )
 
 // ProjectSettingsUpdate is passed to SetSaveProjectSettings to persist management API PATCH fields.
-// The implementation (typically in cmd/cc-connect) maps this to config.ProjectSettingsUpdate.
+// The implementation (typically in cmd/magpie) maps this to config.ProjectSettingsUpdate.
 type ProjectSettingsUpdate struct {
 	Language             *string
 	AdminFrom            *string
@@ -61,7 +61,7 @@ type ManagementServer struct {
 	getGlobalSettings    func() map[string]any
 	saveGlobalSettings   func(map[string]any) error
 
-	// Global provider callbacks (set by cmd/cc-connect)
+	// Global provider callbacks (set by cmd/magpie)
 	listGlobalProviders  func() ([]GlobalProviderInfo, error)
 	addGlobalProvider    func(GlobalProviderInfo) error
 	updateGlobalProvider func(name string, info GlobalProviderInfo) error
@@ -146,10 +146,10 @@ type GlobalProviderInfo struct {
 		Model string `json:"model"`
 		Alias string `json:"alias,omitempty"`
 	} `json:"models,omitempty"`
-	Endpoints       map[string]string              `json:"endpoints,omitempty"`
-	AgentModels     map[string]string              `json:"agent_models,omitempty"`
-	AgentModelLists map[string][]GlobalModelEntry   `json:"agent_model_lists,omitempty"`
-	Codex           *GlobalCodexConfig              `json:"codex,omitempty"`
+	Endpoints       map[string]string             `json:"endpoints,omitempty"`
+	AgentModels     map[string]string             `json:"agent_models,omitempty"`
+	AgentModelLists map[string][]GlobalModelEntry `json:"agent_model_lists,omitempty"`
+	Codex           *GlobalCodexConfig            `json:"codex,omitempty"`
 }
 
 // GlobalModelEntry is a model entry inside AgentModelLists.
@@ -252,7 +252,7 @@ func (m *ManagementServer) buildHandler(mux *http.ServeMux) http.Handler {
 	// Bridge
 	mux.HandleFunc(prefix+"/bridge/adapters", m.wrap(m.handleBridgeAdapters))
 
-	// Static file serving for cc-connect-web (SPA)
+	// Static file serving for magpie-web (SPA)
 	return m.withStaticFallback(mux)
 }
 
@@ -1919,10 +1919,10 @@ func (m *ManagementServer) handleCCSwitchProviders(w http.ResponseWriter, r *htt
 // applying per-agent-type overrides for base_url, model, and models.
 func resolveGlobalProviderForAgent(g GlobalProviderInfo, agentType string) ProviderConfig {
 	pc := ProviderConfig{
-		Name:   g.Name,
-		APIKey: g.APIKey,
+		Name:    g.Name,
+		APIKey:  g.APIKey,
 		BaseURL: g.BaseURL,
-		Model:  g.Model,
+		Model:   g.Model,
 	}
 	if ep, ok := g.Endpoints[agentType]; ok && ep != "" {
 		pc.BaseURL = ep

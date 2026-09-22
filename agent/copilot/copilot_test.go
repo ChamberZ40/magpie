@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 func TestNew_MissingBinary(t *testing.T) {
@@ -309,7 +309,7 @@ func TestAgent_ListSessions_RPC(t *testing.T) {
 
 	// Point agent at the test binary itself acting as a mock copilot
 	a := &Agent{
-		cmd:  bin,
+		cmd:     bin,
 		workDir: ".",
 	}
 
@@ -341,7 +341,7 @@ func TestAgent_DeleteSession_RPC(t *testing.T) {
 	}
 
 	a := &Agent{
-		cmd:  bin,
+		cmd:     bin,
 		workDir: ".",
 	}
 

@@ -134,12 +134,12 @@ func TestReadSettingsFile(t *testing.T) {
 
 func TestParseHookOutput(t *testing.T) {
 	tests := []struct {
-		name         string
-		stdout       string
-		wantBehavior string
-		wantMessage  string
+		name            string
+		stdout          string
+		wantBehavior    string
+		wantMessage     string
 		wantFallthrough bool
-		wantErr      bool
+		wantErr         bool
 	}{
 		{"allow", "allow", "allow", "", false, false},
 		{"deny", "deny", "deny", "", false, false},
@@ -215,11 +215,11 @@ func TestRunHookCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("env strips CC_CONNECT_PERMISSION_HOOK_SKIP", func(t *testing.T) {
-		t.Setenv("CC_CONNECT_PERMISSION_HOOK_SKIP", "1")
+	t.Run("env strips MAGPIE_PERMISSION_HOOK_SKIP", func(t *testing.T) {
+		t.Setenv("MAGPIE_PERMISSION_HOOK_SKIP", "1")
 		// The hook prints "allow" only if the skip flag is absent.
 		decision, err := runHookCommand(context.Background(),
-			`if [ -n "$CC_CONNECT_PERMISSION_HOOK_SKIP" ]; then echo deny; else echo allow; fi`, map[string]any{})
+			`if [ -n "$MAGPIE_PERMISSION_HOOK_SKIP" ]; then echo deny; else echo allow; fi`, map[string]any{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -393,12 +393,12 @@ func TestTryHook(t *testing.T) {
 
 func TestBuildHookStdin(t *testing.T) {
 	hctx := hookContext{
-		sessionID:          "sess-123",
-		toolName:           "Bash",
-		toolInput:          map[string]any{"command": "ls"},
-		cwd:                "/workdir",
-		permissionMode:     "default",
-		transcriptPath:     "/tmp/transcript.jsonl",
+		sessionID:             "sess-123",
+		toolName:              "Bash",
+		toolInput:             map[string]any{"command": "ls"},
+		cwd:                   "/workdir",
+		permissionMode:        "default",
+		transcriptPath:        "/tmp/transcript.jsonl",
 		permissionSuggestions: []any{},
 	}
 	data := buildHookStdin(hctx)

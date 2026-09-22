@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 func init() {
@@ -48,9 +48,9 @@ type Agent struct {
 	providers        []core.ProviderConfig
 	activeIdx        int // -1 = no provider set
 	sessionEnv       []string
-	routerURL        string // Claude Code Router URL (e.g., "http://127.0.0.1:3456")
-	routerAPIKey     string // Claude Code Router API key (optional)
-	systemPrompt     string // Custom system prompt to pass to Claude CLI
+	routerURL        string   // Claude Code Router URL (e.g., "http://127.0.0.1:3456")
+	routerAPIKey     string   // Claude Code Router API key (optional)
+	systemPrompt     string   // Custom system prompt to pass to Claude CLI
 	pluginDirs       []string // Plugin directories to load via --plugin-dir (repeatable)
 
 	appendSystemPrompt string // Custom text appended to the system prompt (keeps Claude's default)
@@ -59,11 +59,11 @@ type Agent struct {
 	proxyLocalURL  string              // local URL of the proxy
 	platformPrompt string              // platform-specific formatting instructions
 
-	// ccDataDir is injected by the cc-connect host (see buildAgentOptions
-	// in cmd/cc-connect/main.go). It locates the global directory where
-	// we write the shared cc-connect system prompt file (issue #1376
+	// ccDataDir is injected by the magpie host (see buildAgentOptions
+	// in cmd/magpie/main.go). It locates the global directory where
+	// we write the shared magpie system prompt file (issue #1376
 	// workaround for Windows 8192-byte cmdline limit). The file at
-	// <ccDataDir>/agent-prompts/cc-connect-system.md is written once per
+	// <ccDataDir>/agent-prompts/magpie-system.md is written once per
 	// startup and shared across all sessions that don't need per-spawn
 	// customisation. Empty value falls back to os.TempDir.
 	ccDataDir string
@@ -76,41 +76,41 @@ type Agent struct {
 }
 
 var claudeProviderManagedEnvVars = map[string]struct{}{
-	"CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST":                  {},
-	"CLAUDE_CODE_USE_BEDROCK":                               {},
-	"CLAUDE_CODE_USE_VERTEX":                                {},
-	"CLAUDE_CODE_USE_FOUNDRY":                               {},
-	"ANTHROPIC_BASE_URL":                                    {},
-	"ANTHROPIC_BEDROCK_BASE_URL":                            {},
-	"ANTHROPIC_VERTEX_BASE_URL":                             {},
-	"ANTHROPIC_FOUNDRY_BASE_URL":                            {},
-	"ANTHROPIC_FOUNDRY_RESOURCE":                            {},
-	"ANTHROPIC_VERTEX_PROJECT_ID":                           {},
-	"CLOUD_ML_REGION":                                       {},
-	"ANTHROPIC_API_KEY":                                     {},
-	"ANTHROPIC_AUTH_TOKEN":                                  {},
-	"CLAUDE_CODE_OAUTH_TOKEN":                               {},
-	"AWS_BEARER_TOKEN_BEDROCK":                              {},
-	"ANTHROPIC_FOUNDRY_API_KEY":                             {},
-	"CLAUDE_CODE_SKIP_BEDROCK_AUTH":                         {},
-	"CLAUDE_CODE_SKIP_VERTEX_AUTH":                          {},
-	"CLAUDE_CODE_SKIP_FOUNDRY_AUTH":                         {},
-	"ANTHROPIC_MODEL":                                       {},
-	"ANTHROPIC_DEFAULT_HAIKU_MODEL":                         {},
-	"ANTHROPIC_DEFAULT_HAIKU_MODEL_DESCRIPTION":             {},
-	"ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME":                    {},
-	"ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES":  {},
-	"ANTHROPIC_DEFAULT_OPUS_MODEL":                          {},
-	"ANTHROPIC_DEFAULT_OPUS_MODEL_DESCRIPTION":              {},
-	"ANTHROPIC_DEFAULT_OPUS_MODEL_NAME":                     {},
-	"ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES":   {},
+	"CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST":                 {},
+	"CLAUDE_CODE_USE_BEDROCK":                              {},
+	"CLAUDE_CODE_USE_VERTEX":                               {},
+	"CLAUDE_CODE_USE_FOUNDRY":                              {},
+	"ANTHROPIC_BASE_URL":                                   {},
+	"ANTHROPIC_BEDROCK_BASE_URL":                           {},
+	"ANTHROPIC_VERTEX_BASE_URL":                            {},
+	"ANTHROPIC_FOUNDRY_BASE_URL":                           {},
+	"ANTHROPIC_FOUNDRY_RESOURCE":                           {},
+	"ANTHROPIC_VERTEX_PROJECT_ID":                          {},
+	"CLOUD_ML_REGION":                                      {},
+	"ANTHROPIC_API_KEY":                                    {},
+	"ANTHROPIC_AUTH_TOKEN":                                 {},
+	"CLAUDE_CODE_OAUTH_TOKEN":                              {},
+	"AWS_BEARER_TOKEN_BEDROCK":                             {},
+	"ANTHROPIC_FOUNDRY_API_KEY":                            {},
+	"CLAUDE_CODE_SKIP_BEDROCK_AUTH":                        {},
+	"CLAUDE_CODE_SKIP_VERTEX_AUTH":                         {},
+	"CLAUDE_CODE_SKIP_FOUNDRY_AUTH":                        {},
+	"ANTHROPIC_MODEL":                                      {},
+	"ANTHROPIC_DEFAULT_HAIKU_MODEL":                        {},
+	"ANTHROPIC_DEFAULT_HAIKU_MODEL_DESCRIPTION":            {},
+	"ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME":                   {},
+	"ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES": {},
+	"ANTHROPIC_DEFAULT_OPUS_MODEL":                         {},
+	"ANTHROPIC_DEFAULT_OPUS_MODEL_DESCRIPTION":             {},
+	"ANTHROPIC_DEFAULT_OPUS_MODEL_NAME":                    {},
+	"ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES":  {},
 
 	// Provider-specific base URL env vars for thinking rewrite proxy routing.
-	// These are set by cc-connect when thinking override is needed for
+	// These are set by magpie when thinking override is needed for
 	// Bedrock/Vertex/Foundry providers that don't use base_url config.
-	"ANTHROPIC_BEDROCK_PROXY_BASE_URL": {},
-	"ANTHROPIC_VERTEX_PROXY_BASE_URL":  {},
-	"ANTHROPIC_FOUNDRY_PROXY_BASE_URL": {},
+	"ANTHROPIC_BEDROCK_PROXY_BASE_URL":                      {},
+	"ANTHROPIC_VERTEX_PROXY_BASE_URL":                       {},
+	"ANTHROPIC_FOUNDRY_PROXY_BASE_URL":                      {},
 	"ANTHROPIC_DEFAULT_SONNET_MODEL":                        {},
 	"ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION":            {},
 	"ANTHROPIC_DEFAULT_SONNET_MODEL_NAME":                   {},
@@ -201,7 +201,7 @@ func New(opts map[string]any) (core.Agent, error) {
 	routerAPIKey, _ := opts["router_api_key"].(string)
 
 	// run_as_user: optional OS-user isolation. Injected into opts from
-	// the project-level config field by cmd/cc-connect/main.go.
+	// the project-level config field by cmd/magpie/main.go.
 	spawnOpts := core.SpawnOptions{}
 	spawnOpts.RunAsUser, _ = opts["run_as_user"].(string)
 	if env, ok := opts["run_as_env"].([]any); ok {
@@ -238,10 +238,10 @@ func New(opts map[string]any) (core.Agent, error) {
 		}
 	}
 
-	// Eagerly materialise the shared cc-connect-system.md at startup so
+	// Eagerly materialise the shared magpie-system.md at startup so
 	// the file exists on disk before the first spawn. claude reads it
 	// via --append-system-prompt-file; the lazy fallback in
-	// newClaudeSession still covers content drift (cc-connect upgrades)
+	// newClaudeSession still covers content drift (magpie upgrades)
 	// and the empty-ccDataDir corner case. Failure here is non-fatal —
 	// the next spawn will retry and surface the error then.
 	if _, err := ensureSharedSystemPromptFile(ccDataDir, core.AgentSystemPrompt()); err != nil {
@@ -804,14 +804,14 @@ func (a *Agent) GetMode() string {
 
 // GetRunAsUser returns the target user for OS-isolation spawning, or ""
 // if no isolation is configured. Set at construction from the project-level
-// run_as_user field (injected into opts by cmd/cc-connect/main.go).
+// run_as_user field (injected into opts by cmd/magpie/main.go).
 //
 // This accessor exists specifically so multi-workspace mode can propagate
 // run_as_user from the parent (project-level) agent into per-workspace
 // agent instances created lazily by core.Engine.getOrCreateWorkspaceAgent.
 // Without this, workspace agents are constructed with a fresh opts map
 // that never contained run_as_user, silently dropping back to the legacy
-// supervisor-user spawn path — which is exactly the leak cc-connect#496
+// supervisor-user spawn path — which is exactly the leak magpie#496
 // is designed to prevent.
 func (a *Agent) GetRunAsUser() string {
 	a.mu.Lock()
@@ -850,7 +850,7 @@ func (a *Agent) GetRunAsEnv() []string {
 // propagate to every workspace agent. sessionEnv is excluded (runtime-only).
 //
 // run_as_user / run_as_env are also omitted because the engine has its own
-// dedicated propagation path via GetRunAsUser/GetRunAsEnv (see cc-connect#496).
+// dedicated propagation path via GetRunAsUser/GetRunAsEnv (see magpie#496).
 func (a *Agent) WorkspaceAgentOptions() map[string]any {
 	a.mu.RLock()
 	defer a.mu.RUnlock()

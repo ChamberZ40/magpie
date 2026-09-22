@@ -3,7 +3,7 @@
 package p2
 
 import (
-	_ "github.com/chenhg5/cc-connect/agent/claudecode"
-	_ "github.com/chenhg5/cc-connect/agent/codex"
-	_ "github.com/chenhg5/cc-connect/agent/cursor"
+	_ "github.com/ChamberZ40/magpie/agent/claudecode"
+	_ "github.com/ChamberZ40/magpie/agent/codex"
+	_ "github.com/ChamberZ40/magpie/agent/cursor"
 )

@@ -63,6 +63,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ChamberZ40/magpie/appid"
 )
 
 // currentUsername returns the current Unix login name, or "" if it can't
@@ -84,7 +86,7 @@ func currentUsername() string {
 // (not argv) so directories containing spaces or non-ASCII survive sudo's
 // command re-quoting. Callers set it on cmd.Env when SpawnOptions.WorkDir is
 // non-empty; BuildSpawnCommand adds it to the --preserve-env allowlist.
-const RunAsChdirEnv = "CC_RUNAS_CHDIR"
+const RunAsChdirEnv = appid.EnvPrefix + "RUNAS_CHDIR"
 
 // DefaultEnvAllowlist is the minimal env preserved across the sudo
 // boundary. Deliberately excluded:
@@ -166,7 +168,7 @@ func BuildSpawnCommand(ctx context.Context, opts SpawnOptions, name string, args
 		// sudo -i runs the command from the target user's HOME, overriding
 		// cmd.Dir, so the agent would otherwise start in the wrong directory
 		// (e.g. ignoring a multi-workspace binding). Re-establish the intended
-		// cwd inside the spawn. The path travels in $CC_RUNAS_CHDIR (a
+		// cwd inside the spawn. The path travels in $MAGPIE_RUNAS_CHDIR (a
 		// preserved env var, set by the caller) rather than argv so paths with
 		// spaces or non-ASCII survive sudo's command re-quoting.
 		sudoArgs = append(sudoArgs,
@@ -180,7 +182,7 @@ func BuildSpawnCommand(ctx context.Context, opts SpawnOptions, name string, args
 
 // FilterEnvForSpawn strips env down to the merged allowlist when
 // opts.IsolationMode() is true. Belt-and-braces with sudo's own
-// --preserve-env, but having cc-connect's spawn argv be the single
+// --preserve-env, but having magpie's spawn argv be the single
 // source of truth keeps test assertions clean.
 func FilterEnvForSpawn(env []string, opts SpawnOptions) []string {
 	if !opts.IsolationMode() {
@@ -230,7 +232,7 @@ func (ExecSudoRunner) Run(ctx context.Context, args ...string) ([]byte, error) {
 // next spawn re-verifies fresh.
 //
 // The expensive checks (work_dir access, isolation probe) live in the
-// preflight and audit packages and only run at startup / via `cc-connect
+// preflight and audit packages and only run at startup / via `magpie
 // doctor user-isolation`.
 func VerifyRunAsUserCheap(ctx context.Context, runner SudoRunner, runAsUser string) error {
 	if runAsUser == "" {

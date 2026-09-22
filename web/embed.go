@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 
-	"github.com/chenhg5/cc-connect/core"
+	"github.com/ChamberZ40/magpie/core"
 )
 
 //go:embed all:dist

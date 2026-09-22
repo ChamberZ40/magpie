@@ -30,11 +30,11 @@ type bridgeCapabilitiesSnapshot struct {
 }
 
 type bridgeCapabilitiesHost struct {
-	ID               string `json:"id"`
-	Hostname         string `json:"hostname,omitempty"`
-	CCConnectVersion string `json:"cc_connect_version,omitempty"`
-	Commit           string `json:"commit,omitempty"`
-	BuildTime        string `json:"build_time,omitempty"`
+	ID            string `json:"id"`
+	Hostname      string `json:"hostname,omitempty"`
+	MagpieVersion string `json:"magpie_version,omitempty"`
+	Commit        string `json:"commit,omitempty"`
+	BuildTime     string `json:"build_time,omitempty"`
 }
 
 type bridgeProjectCapabilities struct {
@@ -133,11 +133,11 @@ func (bs *BridgeServer) buildCapabilitiesSnapshot() bridgeCapabilitiesSnapshot {
 		Type:    bridgeCapabilitiesSnapshotType,
 		Version: 1,
 		Host: bridgeCapabilitiesHost{
-			ID:               hostName,
-			Hostname:         hostName,
-			CCConnectVersion: CurrentVersion,
-			Commit:           CurrentCommit,
-			BuildTime:        CurrentBuildTime,
+			ID:            hostName,
+			Hostname:      hostName,
+			MagpieVersion: CurrentVersion,
+			Commit:        CurrentCommit,
+			BuildTime:     CurrentBuildTime,
 		},
 		Projects: projects,
 	}

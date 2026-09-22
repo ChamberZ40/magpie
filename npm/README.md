@@ -1,26 +1,31 @@
-# cc-connect
+# @chamberz40/magpie
 
-Bridge local AI coding agents (Claude Code, Cursor, Gemini CLI, Codex) to messaging platforms (Feishu/Lark, DingTalk, Slack, Telegram, Discord, LINE, WeChat Work).
+Put your AI coding agent in your chat app. Send a message in Feishu or WeChat;
+the agent runs locally in your own project directory; its output comes back to
+the chat.
 
-Chat with your AI dev assistant from anywhere.
+Agents: Claude Code, Codex, Cursor Agent, GitHub Copilot CLI, and any
+ACP-speaking agent. Platforms: Feishu (Lark), WeChat Work, Weixin.
 
 ## Install
 
 ```bash
-npm install -g cc-connect
+npm install -g @chamberz40/magpie
 ```
+
+This downloads the prebuilt binary for your platform from the matching GitHub
+release and installs it as `magpie`.
 
 ## Usage
 
 ```bash
-# Create config
-cc-connect --version
-
-# Edit config.toml, then run
-cc-connect
-cc-connect -config /path/to/config.toml
+magpie                              # first run creates ~/.magpie/config.toml
+magpie --config /path/to/config.toml
 ```
+
+The first run prints a Web admin URL (`http://localhost:9820`) where you create
+a project and paste your bot credentials.
 
 ## Documentation
 
-See full documentation at: https://github.com/chenhg5/cc-connect
+Full documentation: https://github.com/ChamberZ40/magpie

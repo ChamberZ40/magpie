@@ -3,6 +3,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -55,10 +56,12 @@ func TestInjectedAgentEnv(t *testing.T) {
 		t.Fatalf("InjectedAgentEnv(\"\") = %v, want nil", got)
 	}
 
-	// Non-empty mode must produce the single CC_PERMISSION_MODE entry.
+	// Non-empty mode must produce the entry under both the current and the
+	// pre-rename prefix; agent extensions outside this repo read the old name.
 	got := InjectedAgentEnv("yolo")
-	if len(got) != 1 || got[0] != "CC_PERMISSION_MODE=yolo" {
-		t.Fatalf("InjectedAgentEnv(\"yolo\") = %v, want [CC_PERMISSION_MODE=yolo]", got)
+	want := []string{"MAGPIE_PERMISSION_MODE=yolo", "CC_PERMISSION_MODE=yolo"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("InjectedAgentEnv(\"yolo\") = %v, want %v", got, want)
 	}
 }
 
@@ -71,11 +74,11 @@ func TestInjectedAgentEnv(t *testing.T) {
 // this test asserts every file lands inside attachDir, with no escapees.
 func TestSaveFilesToDisk_RejectsPathTraversal(t *testing.T) {
 	workDir := t.TempDir()
-	attachDir := filepath.Join(workDir, ".cc-connect", "attachments")
+	attachDir := filepath.Join(workDir, ".magpie", "attachments")
 
 	files := []FileAttachment{
 		// The original repro: walks two levels up out of attachments and
-		// out of .cc-connect/, landing directly in workDir.
+		// out of .magpie/, landing directly in workDir.
 		{FileName: "../../escape.txt", Data: []byte("payload")},
 		// Three levels up — would land in workDir's parent without the fix.
 		{FileName: "../../../way-up.txt", Data: []byte("payload")},
@@ -122,12 +125,12 @@ func TestSaveFilesToDisk_RejectsPathTraversal(t *testing.T) {
 }
 
 // TestSaveFilesToDisk_RelativeWorkDirReturnsAbsolutePaths guards the
-// regression from issue #1459: when workDir is relative (e.g. ".cc-connect"
+// regression from issue #1459: when workDir is relative (e.g. ".magpie"
 // or "project/sub"), SaveFilesToDisk used to return relative paths that did
 // not match where the file actually landed once the agent process started
 // from a different cwd. The fix absolutizes workDir before joining, so the
 // returned paths are usable from anywhere — including the spawned agent
-// process whose cwd may differ from cc-connect's.
+// process whose cwd may differ from magpie's.
 func TestSaveFilesToDisk_RelativeWorkDirReturnsAbsolutePaths(t *testing.T) {
 	// Build a real directory under t.TempDir() and feed a relative path
 	// to SaveFilesToDisk. The returned paths must be absolute regardless
@@ -167,7 +170,7 @@ func TestSaveFilesToDisk_RelativeWorkDirReturnsAbsolutePaths(t *testing.T) {
 
 // TestSaveFilesToDisk_AbsoluteWorkDirReturnsAbsolutePaths confirms the
 // common case (deploys with an absolute workDir) keeps working — no
-// regression for users who already configured cc-connect with absolute
+// regression for users who already configured magpie with absolute
 // paths. The returned path is the abs version of the input joined with
 // the standard attachments directory.
 func TestSaveFilesToDisk_AbsoluteWorkDirReturnsAbsolutePaths(t *testing.T) {
@@ -198,6 +201,10 @@ func TestSaveFilesToDisk_AbsoluteWorkDirReturnsAbsolutePaths(t *testing.T) {
 // attachment should still land somewhere writable rather than fail the
 // spawn — falling back to the process cwd is the documented contract.
 func TestSaveFilesToDisk_EmptyWorkDirFallsBackToCwd(t *testing.T) {
+	// A clean cwd: the fallback adopts a pre-existing .cc-connect directory if
+	// one is there, and an earlier run of this very test used to leave one.
+	t.Chdir(t.TempDir())
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -210,12 +217,10 @@ func TestSaveFilesToDisk_EmptyWorkDirFallsBackToCwd(t *testing.T) {
 	if !filepath.IsAbs(got[0]) {
 		t.Errorf("empty workDir yielded non-absolute path %q", got[0])
 	}
-	wantPrefix := filepath.Join(cwd, ".cc-connect", "attachments") + string(filepath.Separator)
+	wantPrefix := filepath.Join(cwd, ".magpie", "attachments") + string(filepath.Separator)
 	if !strings.HasPrefix(got[0], wantPrefix) {
 		t.Errorf("empty workDir path %q did not fall back to cwd-based attachDir %q", got[0], wantPrefix)
 	}
-	// Clean up so we don't litter the test cwd.
-	t.Cleanup(func() { _ = os.Remove(got[0]) })
 }
 
 func TestSaveFilesToDisk_SameNameInOneCall(t *testing.T) {
@@ -244,7 +249,7 @@ func TestSaveFilesToDisk_SameNameInOneCall(t *testing.T) {
 		}
 	}
 
-	entries, err := os.ReadDir(filepath.Join(workDir, ".cc-connect", "attachments", "message-1"))
+	entries, err := os.ReadDir(filepath.Join(workDir, ".magpie", "attachments", "message-1"))
 	if err != nil {
 		t.Fatalf("read message attachment directory: %v", err)
 	}
@@ -300,7 +305,7 @@ func TestSaveFilesToDisk_NoSubdirBackwardsCompat(t *testing.T) {
 	if len(first) != 1 {
 		t.Fatalf("first legacy save returned %d paths, want 1", len(first))
 	}
-	wantPath := filepath.Join(workDir, ".cc-connect", "attachments", "legacy.txt")
+	wantPath := filepath.Join(workDir, ".magpie", "attachments", "legacy.txt")
 	if first[0] != wantPath {
 		t.Fatalf("legacy path = %q, want %q", first[0], wantPath)
 	}
@@ -343,7 +348,7 @@ func TestAppendFileRefs_AbsolutizesRelativePaths(t *testing.T) {
 	// and verify each one is an absolute path. This is the load-bearing check:
 	// the prompt handed to the agent must always point at real on-disk
 	// locations, never bare relative paths that only resolve from the
-	// cc-connect process's cwd.
+	// magpie process's cwd.
 	listStart := strings.Index(got, "please read them: ")
 	if listStart < 0 {
 		t.Fatalf("AppendFileRefs output missing the file-ref list marker: %q", got)
