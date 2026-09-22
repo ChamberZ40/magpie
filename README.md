@@ -14,6 +14,11 @@ leaves your machine except the text you'd have typed into the agent anyway.
 The point is untethering. The agent keeps working on the long task while you
 walk away from the desk, and you steer it from your phone.
 
+> Magpie is a fork of [chenhg5/cc-connect](https://github.com/chenhg5/cc-connect).
+> Most of the code here is upstream's. This fork trims it to the agents and
+> platforms it actually uses, and no longer tracks upstream. It is not
+> affiliated with or endorsed by the upstream project. See [License](#license).
+
 <p align="center">
   <img src="docs/images/connector.png" alt="Magpie Architecture" width="90%"/>
 </p>

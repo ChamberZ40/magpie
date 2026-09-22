@@ -73,3 +73,12 @@ magpie --help             # every command, plus the agents and platforms this bu
 ## Documentation
 
 Full documentation: https://github.com/ChamberZ40/magpie
+
+## License and credits
+
+[MIT](https://github.com/ChamberZ40/magpie/blob/main/LICENSE).
+
+Magpie is a fork of [chenhg5/cc-connect](https://github.com/chenhg5/cc-connect),
+which declares MIT in its `npm/package.json`. Most of the code is upstream's;
+this fork trims it to the agents and platforms listed above and no longer
+tracks upstream. It is not affiliated with or endorsed by the upstream project.

@@ -12,6 +12,10 @@
 
 它解决的是「人得守在电脑前」这件事：长任务照跑，你可以起身走开，用手机盯着。
 
+> Magpie 是 [chenhg5/cc-connect](https://github.com/chenhg5/cc-connect) 的 fork。
+> 代码主体来自上游；本 fork 把它裁剪到自己实际用得到的 Agent 与平台，并且不再
+> 跟随上游更新。本项目与上游没有隶属关系，也未获其背书。详见[许可](#许可)。
+
 <p align="center">
   <img src="docs/images/connector.png" alt="Magpie Architecture" width="90%"/>
 </p>
