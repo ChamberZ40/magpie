@@ -34,7 +34,9 @@ func TestParseDaemonInstallArgs_ConfigEqualsFormSetsWorkDir(t *testing.T) {
 }
 
 func TestParseDaemonInstallArgs_NoCaptureSecretsFlag(t *testing.T) {
-	os.Unsetenv("MAGPIE_DAEMON_NO_CAPTURE_SECRETS")
+	if err := os.Unsetenv("MAGPIE_DAEMON_NO_CAPTURE_SECRETS"); err != nil {
+		t.Fatalf("unsetenv: %v", err)
+	}
 
 	cfg, _, err := parseDaemonInstallArgs([]string{"--no-capture-secrets"})
 	if err != nil {

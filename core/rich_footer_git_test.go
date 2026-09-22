@@ -134,7 +134,14 @@ func TestRichFooter_GitBranchUsesRawPathNotCompacted(t *testing.T) {
 	if err != nil {
 		t.Skipf("cannot create a repo under home: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() {
+		// This one is not t.TempDir(): it lives under the real $HOME so the
+		// footer has a path to compact. Leaving it behind litters the user's
+		// home directory, so say so rather than dropping the error.
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("cleanup %s: %v", dir, err)
+		}
+	})
 	head := filepath.Join(dir, ".git", "HEAD")
 	if err := os.MkdirAll(filepath.Dir(head), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
