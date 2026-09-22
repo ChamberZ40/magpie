@@ -44,7 +44,14 @@ jobs:
       - name: Run tests
         run: go test ./...
 
-      # release-all runs `make web` itself, which needs pnpm on PATH.
+      # `make web` falls back to `npm install` when web/node_modules is
+      # missing, which would ignore pnpm-lock.yaml and resolve versions CI
+      # never tested. Populate node_modules from the lockfile first; the
+      # `npm run build` inside `make web` is happy with a pnpm tree.
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
       - name: Build release archives
         run: make release-all VERSION="${GITHUB_REF_NAME}"
 
