@@ -62,15 +62,9 @@ func NewManager() (Manager, error) {
 }
 
 // DefaultLogFile is where the daemon logs unless configured otherwise, and the
-// path `logs` falls back to when daemon.json is missing. The filename tracks
-// the directory: an install that kept ~/.cc-connect kept cc-connect.log in it.
+// path `logs` falls back to when daemon.json is missing.
 func DefaultLogFile() string {
-	dir := DefaultDataDir()
-	name := appid.Name
-	if filepath.Base(dir) == appid.LegacyDirName {
-		name = appid.LegacyName
-	}
-	return filepath.Join(dir, "logs", name+".log")
+	return filepath.Join(DefaultDataDir(), "logs", appid.Name+".log")
 }
 
 func DefaultDataDir() string {

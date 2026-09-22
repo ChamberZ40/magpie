@@ -56,8 +56,8 @@ func TestParseSendArgs_RequiresMessageOrAttachment(t *testing.T) {
 }
 
 func TestParseSendArgs_UsesSessionEnvFallback(t *testing.T) {
-	t.Setenv("CC_PROJECT", "demo")
-	t.Setenv("CC_SESSION_KEY", "telegram:123:456")
+	t.Setenv("MAGPIE_PROJECT", "demo")
+	t.Setenv("MAGPIE_SESSION_KEY", "telegram:123:456")
 
 	dir := t.TempDir()
 	imgPath := filepath.Join(dir, "chart.png")
@@ -183,8 +183,8 @@ func TestParseSendArgs_AudioVideoFileMixed_StaySeparate(t *testing.T) {
 }
 
 func TestParseSendArgs_TTSOnly(t *testing.T) {
-	t.Setenv("CC_PROJECT", "demo")
-	t.Setenv("CC_SESSION_KEY", "telegram:123:456")
+	t.Setenv("MAGPIE_PROJECT", "demo")
+	t.Setenv("MAGPIE_SESSION_KEY", "telegram:123:456")
 
 	req, _, err := parseSendArgs([]string{"--tts", "hello voice"})
 	if err != nil {

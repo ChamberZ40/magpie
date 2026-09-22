@@ -197,19 +197,7 @@ func launchdPlistPathFor(label string) string {
 }
 
 // launchdLabel is the label this machine's service is addressed by.
-//
-// A service installed before the rename keeps running as com.cc-connect.service
-// until it is uninstalled, so status, restart and uninstall have to address it
-// by that name — and install has to overwrite that plist in place, rather than
-// leave it loaded and add a second service under the new label. Running
-// `daemon uninstall` once, then installing again, moves onto appid.ServiceLabel.
 func launchdLabel() string {
-	if _, err := os.Stat(launchdPlistPathFor(appid.ServiceLabel)); err == nil {
-		return appid.ServiceLabel
-	}
-	if _, err := os.Stat(launchdPlistPathFor(appid.LegacyServiceLabel)); err == nil {
-		return appid.LegacyServiceLabel
-	}
 	return appid.ServiceLabel
 }
 

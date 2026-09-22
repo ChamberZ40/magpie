@@ -48,8 +48,7 @@ func MergeEnv(base, extra []string) []string {
 //	    calls in yolo mode. An empty mode returns nil, so non-yolo sessions see
 //	    no injected var.
 //
-// This is a public extension contract, so each var is also exported under its
-// pre-rename CC_ name for extensions that have not been updated yet.
+// This is a public extension contract, so the variable name is stable.
 //
 // Kept as a single core helper so every agent opts into the same convention
 // instead of hardcoding the variable name; extending the contract (e.g. a model

@@ -76,7 +76,7 @@ func TestBuildSpawnCommand_RunAsUser(t *testing.T) {
 // sudo -i runs the command from the target user's HOME, ignoring cmd.Dir, so a
 // run_as_user agent ignored its (multi-workspace) working directory. With
 // WorkDir set the command must be wrapped so it chdirs into WorkDir — passed
-// via the CC_RUNAS_CHDIR env var (added to the preserve-env allowlist), not
+// via the MAGPIE_RUNAS_CHDIR env var (added to the preserve-env allowlist), not
 // argv, so non-ASCII paths survive sudo's command re-quoting.
 func TestBuildSpawnCommand_RunAsUserWithWorkDir(t *testing.T) {
 	ctx := context.Background()
@@ -97,7 +97,7 @@ func TestBuildSpawnCommand_RunAsUserWithWorkDir(t *testing.T) {
 	if cmd.Args[5] != "--" {
 		t.Fatalf("args[5] = %q, want --", cmd.Args[5])
 	}
-	// Expected wrapper: -- /bin/sh -c "cd \"$CC_RUNAS_CHDIR\" || exit 1; exec \"$@\"" sh claude --version -p hello
+	// Expected wrapper: -- /bin/sh -c "cd \"$MAGPIE_RUNAS_CHDIR\" || exit 1; exec \"$@\"" sh claude --version -p hello
 	wantWrap := []string{
 		"/bin/sh", "-c",
 		"cd \"$" + RunAsChdirEnv + "\" || exit 1; exec \"$@\"",

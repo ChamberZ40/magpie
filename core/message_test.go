@@ -56,10 +56,11 @@ func TestInjectedAgentEnv(t *testing.T) {
 		t.Fatalf("InjectedAgentEnv(\"\") = %v, want nil", got)
 	}
 
-	// Non-empty mode must produce the entry under both the current and the
-	// pre-rename prefix; agent extensions outside this repo read the old name.
+	// Non-empty mode must produce the entry under the current prefix, and only
+	// that one — a stale CC_ variable belonging to some other tool must never
+	// be able to stand in for it.
 	got := InjectedAgentEnv("yolo")
-	want := []string{"MAGPIE_PERMISSION_MODE=yolo", "CC_PERMISSION_MODE=yolo"}
+	want := []string{"MAGPIE_PERMISSION_MODE=yolo"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("InjectedAgentEnv(\"yolo\") = %v, want %v", got, want)
 	}
@@ -201,8 +202,8 @@ func TestSaveFilesToDisk_AbsoluteWorkDirReturnsAbsolutePaths(t *testing.T) {
 // attachment should still land somewhere writable rather than fail the
 // spawn — falling back to the process cwd is the documented contract.
 func TestSaveFilesToDisk_EmptyWorkDirFallsBackToCwd(t *testing.T) {
-	// A clean cwd: the fallback adopts a pre-existing .cc-connect directory if
-	// one is there, and an earlier run of this very test used to leave one.
+	// A clean cwd, so an earlier run's .magpie directory cannot be mistaken
+	// for the one this call is supposed to create.
 	t.Chdir(t.TempDir())
 
 	cwd, err := os.Getwd()

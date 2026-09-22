@@ -644,9 +644,6 @@ fi
 
 magpie sets `MAGPIE_PERMISSION_HOOK_SKIP=1` in the Claude Code subprocess environment. When your hook sees this variable, it's running inside Claude Code (result will be discarded) — skip the expensive work. magpie strips this variable when it runs the hook itself, so the second execution proceeds normally.
 
-> The pre-rename name `CC_PERMISSION_HOOK_SKIP` is still set alongside it, so an
-> existing hook script keeps working. New scripts should use the `MAGPIE_` name.
-
 ---
 
 ## Voice Messages (Speech-to-Text)

@@ -8,8 +8,8 @@ import (
 )
 
 func TestDefaultAuditDir_HomeSuffix(t *testing.T) {
-	// A clean home, so the legacy-directory fallback doesn't resolve to the
-	// ~/.cc-connect that a pre-rename install left on the developer's machine.
+	// A clean home, so the result cannot be an audit directory that some
+	// earlier run left on the developer's machine.
 	t.Setenv("HOME", t.TempDir())
 
 	dir, err := defaultAuditDir()

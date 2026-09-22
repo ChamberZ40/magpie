@@ -169,13 +169,13 @@ func TestEmit_CommandHookEnvVars(t *testing.T) {
 	envStr := string(data)
 
 	expected := map[string]string{
-		"CC_HOOK_EVENT":       "message.received",
-		"CC_HOOK_PROJECT":     "my-proj",
-		"CC_HOOK_SESSION_KEY": "slack:C1:U1",
-		"CC_HOOK_PLATFORM":    "slack",
-		"CC_HOOK_USER_ID":     "U1",
-		"CC_HOOK_USER_NAME":   "bob",
-		"CC_HOOK_CONTENT":     "test msg",
+		"MAGPIE_HOOK_EVENT":       "message.received",
+		"MAGPIE_HOOK_PROJECT":     "my-proj",
+		"MAGPIE_HOOK_SESSION_KEY": "slack:C1:U1",
+		"MAGPIE_HOOK_PLATFORM":    "slack",
+		"MAGPIE_HOOK_USER_ID":     "U1",
+		"MAGPIE_HOOK_USER_NAME":   "bob",
+		"MAGPIE_HOOK_CONTENT":     "test msg",
 	}
 	for k, v := range expected {
 		line := k + "=" + v
@@ -401,22 +401,22 @@ func TestEventToEnv(t *testing.T) {
 	}
 
 	checks := map[string]string{
-		"CC_HOOK_EVENT":       "cron.triggered",
-		"CC_HOOK_PROJECT":     "myproj",
-		"CC_HOOK_SESSION_KEY": "tg:1:1",
-		"CC_HOOK_PLATFORM":    "telegram",
-		"CC_HOOK_USER_ID":     "U123",
-		"CC_HOOK_USER_NAME":   "alice",
-		"CC_HOOK_CONTENT":     "hello world",
-		"CC_HOOK_ERROR":       "oops",
+		"MAGPIE_HOOK_EVENT":       "cron.triggered",
+		"MAGPIE_HOOK_PROJECT":     "myproj",
+		"MAGPIE_HOOK_SESSION_KEY": "tg:1:1",
+		"MAGPIE_HOOK_PLATFORM":    "telegram",
+		"MAGPIE_HOOK_USER_ID":     "U123",
+		"MAGPIE_HOOK_USER_NAME":   "alice",
+		"MAGPIE_HOOK_CONTENT":     "hello world",
+		"MAGPIE_HOOK_ERROR":       "oops",
 	}
 	for k, want := range checks {
 		if got := m[k]; got != want {
 			t.Errorf("%s = %q, want %q", k, got, want)
 		}
 	}
-	if _, ok := m["CC_HOOK_TIMESTAMP"]; !ok {
-		t.Error("expected CC_HOOK_TIMESTAMP in env")
+	if _, ok := m["MAGPIE_HOOK_TIMESTAMP"]; !ok {
+		t.Error("expected MAGPIE_HOOK_TIMESTAMP in env")
 	}
 }
 
@@ -427,10 +427,10 @@ func TestEventToEnv_EmptyFieldsOmitted(t *testing.T) {
 	}
 	env := eventToEnv(e)
 	for _, kv := range env {
-		if strings.HasPrefix(kv, "CC_HOOK_SESSION_KEY=") ||
-			strings.HasPrefix(kv, "CC_HOOK_PLATFORM=") ||
-			strings.HasPrefix(kv, "CC_HOOK_USER_ID=") ||
-			strings.HasPrefix(kv, "CC_HOOK_CONTENT=") {
+		if strings.HasPrefix(kv, "MAGPIE_HOOK_SESSION_KEY=") ||
+			strings.HasPrefix(kv, "MAGPIE_HOOK_PLATFORM=") ||
+			strings.HasPrefix(kv, "MAGPIE_HOOK_USER_ID=") ||
+			strings.HasPrefix(kv, "MAGPIE_HOOK_CONTENT=") {
 			t.Errorf("expected empty field to be omitted: %s", kv)
 		}
 	}

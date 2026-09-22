@@ -508,8 +508,8 @@ func TestHandleRelay_SingleWorkspaceUsesGlobalAgentAndSourceSessionKey(t *testin
 	if resp != "global" {
 		t.Fatalf("HandleRelay() response = %q, want %q", resp, "global")
 	}
-	if got := agent.EnvValue("CC_SESSION_KEY"); got != sourceSessionKey {
-		t.Fatalf("CC_SESSION_KEY = %q, want %q", got, sourceSessionKey)
+	if got := agent.EnvValue("MAGPIE_SESSION_KEY"); got != sourceSessionKey {
+		t.Fatalf("MAGPIE_SESSION_KEY = %q, want %q", got, sourceSessionKey)
 	}
 	if got := e.sessions.ActiveSessionID("relay:source:discord:C1"); got == "" {
 		t.Fatal("expected relay session to be stored under platform-qualified relay key")
@@ -543,10 +543,10 @@ func TestHandleRelay_MultiWorkspaceRoutesBySourceSessionKey(t *testing.T) {
 	if resp != "workspace" {
 		t.Fatalf("HandleRelay() response = %q, want %q", resp, "workspace")
 	}
-	if got := workspaceAgent.EnvValue("CC_SESSION_KEY"); got != sourceSessionKey {
-		t.Fatalf("workspace CC_SESSION_KEY = %q, want %q", got, sourceSessionKey)
+	if got := workspaceAgent.EnvValue("MAGPIE_SESSION_KEY"); got != sourceSessionKey {
+		t.Fatalf("workspace MAGPIE_SESSION_KEY = %q, want %q", got, sourceSessionKey)
 	}
-	if got := globalAgent.EnvValue("CC_SESSION_KEY"); got != "" {
+	if got := globalAgent.EnvValue("MAGPIE_SESSION_KEY"); got != "" {
 		t.Fatalf("global agent should not receive relay env, got %q", got)
 	}
 	if got := e.sessions.ActiveSessionID("relay:source:mock:" + channelID); got != "" {

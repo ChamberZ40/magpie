@@ -559,8 +559,6 @@ fi
 
 magpie 启动 Claude Code 子进程时会在环境中设置 `MAGPIE_PERMISSION_HOOK_SKIP=1`。当你的 hook 检测到这个变量时，说明它运行在 Claude Code 内部（结果会被丢弃）——跳过昂贵的逻辑即可。magpie 在自己执行 hook 时会剥离这个变量，所以第二次执行会正常运行。
 
-> 改名前的 `CC_PERMISSION_HOOK_SKIP` 仍会一并设置，已有的 hook 脚本无需改动；新脚本请使用 `MAGPIE_` 名称。
-
 ---
 
 ## 语音消息（语音转文字）

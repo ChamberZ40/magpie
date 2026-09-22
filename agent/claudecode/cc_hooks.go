@@ -237,31 +237,16 @@ func matchHookEntry(matcher, toolName string) bool {
 	return strings.EqualFold(matcher, toolName)
 }
 
-// permissionHookSkipVars are the environment variables that carry the
-// "you are the discarded run" flag to a PermissionRequest hook, current name
-// first. Injection (session.go) and stripping (runHookCommand) both read this
-// list, so the two can never drift apart — they did once, and the old name
-// stopped being emitted while the docs still told users to test for it.
-var permissionHookSkipVars = []string{
-	"MAGPIE_PERMISSION_HOOK_SKIP",
-	"CC_PERMISSION_HOOK_SKIP",
-}
+// permissionHookSkipVar carries the "you are the discarded run" flag to a
+// PermissionRequest hook. Injection (session.go) and stripping
+// (runHookCommand) both name this constant, so the two cannot drift apart —
+// they did once, when each side spelled the variable out by hand.
+const permissionHookSkipVar = "MAGPIE_PERMISSION_HOOK_SKIP"
 
-// permissionHookSkipEnv returns the assignments that tell a PermissionRequest
+// permissionHookSkipEnv returns the assignment that tells a PermissionRequest
 // hook it is running inside Claude Code, where its result is discarded.
-//
-// Both the current and the pre-rename name, because the consumer is a hook
-// script the user wrote: it lives outside this repository and cannot be
-// updated in the same commit. A script that still tests the old name would
-// otherwise never see the flag and would do its expensive work — an LLM call,
-// typically — on the run whose answer we throw away. Mirrors appid.EnvPair,
-// which this package cannot call without importing core's dependency.
 func permissionHookSkipEnv() []string {
-	env := make([]string, 0, len(permissionHookSkipVars))
-	for _, name := range permissionHookSkipVars {
-		env = append(env, name+"=1")
-	}
-	return env
+	return []string{permissionHookSkipVar + "=1"}
 }
 
 // runHookCommand executes a hook command with tool info on stdin.
@@ -284,15 +269,9 @@ func runHookCommand(
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	// Strip the skip flag so the hook does real work when magpie
-	// calls it (even if the host environment has it set). Every name we
-	// emit has to be stripped here, or a hook testing the one we missed
-	// skips exactly the run we need.
-	env := os.Environ()
-	for _, name := range permissionHookSkipVars {
-		env = filterEnv(env, name)
-	}
-	cmd.Env = env
+	// Strip the skip flag so the hook does real work when magpie calls it
+	// (even if the host environment has it set).
+	cmd.Env = filterEnv(os.Environ(), permissionHookSkipVar)
 
 	if err := cmd.Run(); err != nil {
 		return ccHookDecision{}, fmt.Errorf("hook exec: %w (stderr: %s)", err, truncateStr(strings.TrimSpace(stderr.String()), 200))

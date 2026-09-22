@@ -172,23 +172,8 @@ func (m *systemdManager) unitPath() string {
 }
 
 // serviceName is the unit this machine's service is addressed by.
-//
-// A service installed before the rename stays registered as cc-connect.service
-// until it is uninstalled, so start, stop, status and uninstall have to name it
-// that way — and install has to overwrite that unit in place, rather than leave
-// it enabled and register a second one. Running `daemon uninstall` once, then
-// installing again, moves onto magpie.service.
 func (m *systemdManager) serviceName() string {
-	dir := m.unitDir()
-	current := appid.Name + ".service"
-	if _, err := os.Stat(filepath.Join(dir, current)); err == nil {
-		return current
-	}
-	legacy := appid.LegacyName + ".service"
-	if _, err := os.Stat(filepath.Join(dir, legacy)); err == nil {
-		return legacy
-	}
-	return current
+	return appid.Name + ".service"
 }
 
 func (m *systemdManager) buildUnit(cfg Config) string {
