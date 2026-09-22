@@ -32,7 +32,7 @@ make build
 ### Option B: npm
 
 ```bash
-npm install -g @chamberz40/magpie
+npm install -g @z40/magpie
 ```
 
 The postinstall script downloads the prebuilt binary for this platform from the
@@ -468,7 +468,7 @@ magpie --version
 ### npm users
 
 ```bash
-npm update -g magpie
+npm update -g @z40/magpie
 ```
 
 ### Binary users

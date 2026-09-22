@@ -117,7 +117,7 @@ make build                 # 产物为 ./magpie
 **用 npm 装** —— 从对应的 GitHub Release 下载预编译二进制：
 
 ```bash
-npm install -g @chamberz40/magpie
+npm install -g @z40/magpie
 ```
 
 **从 GitHub Release 下载** —— 在

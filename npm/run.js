@@ -65,7 +65,7 @@ if (needsReinstall()) {
       cwd: __dirname,
     });
   } catch {
-    console.error("[magpie] Auto-install failed. Run manually: npm uninstall -g @chamberz40/magpie && npm install -g @chamberz40/magpie");
+    console.error("[magpie] Auto-install failed. Run manually: npm uninstall -g @z40/magpie && npm install -g @z40/magpie");
     process.exit(1);
   }
 }

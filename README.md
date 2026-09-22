@@ -121,7 +121,7 @@ make build                 # produces ./magpie
 **From npm** — downloads a prebuilt binary from the matching GitHub release:
 
 ```bash
-npm install -g @chamberz40/magpie
+npm install -g @z40/magpie
 ```
 
 **From a GitHub release** — grab the archive for your platform from

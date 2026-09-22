@@ -1,4 +1,4 @@
-# @chamberz40/magpie
+# @z40/magpie
 
 Put your AI coding agent in your chat app. Send a message in Feishu or WeChat;
 the agent runs locally in your own project directory; its output comes back to
@@ -10,7 +10,7 @@ ACP-speaking agent. Platforms: Feishu (Lark), WeChat Work, Weixin.
 ## Install
 
 ```bash
-npm install -g @chamberz40/magpie
+npm install -g @z40/magpie
 ```
 
 This downloads the prebuilt binary for your platform from the matching GitHub
