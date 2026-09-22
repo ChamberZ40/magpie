@@ -15,11 +15,13 @@ const (
 	progressStyleCompact = "compact"
 	progressStyleCard    = "card"
 
-	// ProgressCardPayloadPrefix marks a structured payload for card-style progress.
-	// The literal keeps the pre-rename spelling on purpose: it is an opaque,
-	// version-tagged sentinel, never shown to a user, and changing it would make
-	// payloads already in flight unparseable for no gain.
-	ProgressCardPayloadPrefix = "__cc_connect_progress_card_v1__:"
+	// ProgressCardPayloadPrefix marks a structured payload for card-style
+	// progress. It is an internal sentinel: the payload is built here, handed
+	// to the platform adapter inside the same process, and turned into card
+	// JSON before anything leaves the binary — it is never persisted and never
+	// transmitted, which platform tests assert directly. So the name is free to
+	// follow the project's.
+	ProgressCardPayloadPrefix = "__magpie_progress_card_v1__:"
 
 	// Keep a margin below platform hard limit for markdown wrappers/code fences.
 	compactProgressMaxChars = maxPlatformMessageLen - 200
