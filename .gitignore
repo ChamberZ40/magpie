@@ -43,6 +43,13 @@ config.*.toml
 .env
 *.local.toml
 
+# Per-machine tool config. settings.local.json holds one developer's own
+# permission grants, which carry absolute home-directory paths; the shared
+# settings belong in .claude/settings.json instead.
+.claude/settings.local.json
+*.local.json
+.playwright-mcp/
+
 # Instance lock files (created at startup, released on shutdown)
 *.toml.lock
 
