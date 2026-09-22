@@ -316,19 +316,12 @@ func main() {
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config (%s): %v\n", configPath, err)
+		fmt.Fprint(os.Stderr, configLoadErrorHint(configPath, err))
 		os.Exit(1)
 	}
 
 	config.ConfigPath = configPath
 	slog.Info("config loaded", "path", configPath)
-
-	if len(cfg.Projects) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: no projects configured in %s\n", configPath)
-		fmt.Fprintln(os.Stderr, "Add at least one [[project]] section to your config.toml, or run:")
-		fmt.Fprintln(os.Stderr, "  magpie init")
-		os.Exit(1)
-	}
 
 	setupLogger(cfg.Log.Level, logWriter)
 
@@ -1563,38 +1556,23 @@ func bootstrapConfig(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
+	return os.WriteFile(path, []byte(defaultConfigTemplate()), 0o644)
+}
 
-	const tmpl = `# magpie configuration
-# Docs: https://github.com/ChamberZ40/magpie
+// configLoadErrorHint explains a config that would not load. The error alone
+// names the rule that was broken but not what to do about it, and this is the
+// wall a first-time user hits right after editing the generated file.
+//
+// Every command it names must exist — it used to point at `magpie init`,
+// which does not, so the one instruction a stuck user was given failed.
+func configLoadErrorHint(configPath string, err error) string {
+	return fmt.Sprintf(`Error loading config (%s): %v
 
-[log]
-level = "info"
+Fix that file, then run magpie again. For a complete annotated example of
+every option:
 
-[[projects]]
-name = "my-project"
-
-[projects.agent]
-type = "claudecode"   # "claudecode", "codex", "cursor", "gemini", "qoder", "opencode", or "iflow"
-
-[projects.agent.options]
-work_dir = "/path/to/your/project"
-mode = "default"
-# model = "claude-sonnet-4-20250514"
-
-# --- Choose at least one platform below ---
-
-# Feishu / Lark (WebSocket, no public IP needed)
-[[projects.platforms]]
-type = "feishu"
-
-[projects.platforms.options]
-app_id = "your-feishu-app-id"
-app_secret = "your-feishu-app-secret"
-
-# For more platforms (DingTalk, Telegram, Slack, Discord, LINE, WeChat Work)
-# see: https://github.com/ChamberZ40/magpie/blob/main/config.example.toml
-`
-	return os.WriteFile(path, []byte(tmpl), 0o644)
+magpie config example
+`, configPath, err)
 }
 
 func printUsage() {

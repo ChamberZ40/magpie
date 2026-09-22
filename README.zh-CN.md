@@ -19,18 +19,33 @@
 
 ## 快速开始
 
-前提：Go 1.25+ 和 Node.js（构建会一并打包内嵌 Web UI），以及一个**已安装且已登录**
-的 Agent CLI —— 两者都见[安装](#安装)。
+最快的路子是 npm 包 —— 它直接下载预编译二进制，既不需要 Go 也不需要 Node 的
+构建工具链：
+
+```bash
+npm install -g @z40/magpie
+```
+
+想从源码构建，则需要 Go 1.25+ 和 Node.js（构建会一并打包内嵌 Web UI），见[安装](#安装)：
 
 ```bash
 git clone https://github.com/ChamberZ40/magpie.git
 cd magpie
 make build                 # 产物为 ./magpie
-./magpie                   # 自动创建 ~/.magpie/config.toml，打印 http://localhost:9820
 ```
 
-打开那个地址，建项目、粘贴机器人凭据、保存。Magpie 会热重载。给机器人发条消息，
-确认链路通了。
+无论哪条路，你都还需要一个**已安装且已登录**的 Agent CLI —— magpie 以子进程方式
+拉起它，并沿用它的登录凭据。然后：
+
+```bash
+magpie                     # 创建 ~/.magpie/config.toml 后退出
+```
+
+打开这个文件：把 `work_dir` 指向你要让 Agent 干活的目录（该目录必须已存在），再填上
+机器人凭据 —— 飞书那半可以用 `magpie feishu setup` 代劳，`magpie config example`
+会打印带注释的全量配置示例。填好后再跑一次 `magpie`，给机器人发条消息确认链路通了。
+
+桥跑起来之后想开 Web 管理界面，用 `magpie web`，或在聊天里发 `/web setup`。
 
 
 ## 包含哪些

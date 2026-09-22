@@ -60,6 +60,63 @@ func describeRegistered(names []string, display map[string]string) string {
 	return strings.Join(labels, ", ")
 }
 
+// quotedNames renders registry names as a TOML-comment-friendly list:
+// `"acp", "claudecode", "codex"`. Sorted, so the generated file is stable.
+func quotedNames(names []string) string {
+	if len(names) == 0 {
+		return "(none compiled in)"
+	}
+	sorted := append([]string(nil), names...)
+	sort.Strings(sorted)
+	quoted := make([]string, 0, len(sorted))
+	for _, n := range sorted {
+		quoted = append(quoted, `"`+n+`"`)
+	}
+	return strings.Join(quoted, ", ")
+}
+
+// defaultConfigTemplate is the config written on first run, when there is
+// nothing at the resolved path yet.
+//
+// The agent and platform lines come from the registry for the same reason the
+// banner does: hand-written, they drifted into offering four agent types and
+// five platforms this project has never shipped — and this file is the first
+// thing a new user edits.
+func defaultConfigTemplate() string {
+	return fmt.Sprintf(`# magpie configuration
+# Docs: https://github.com/ChamberZ40/magpie
+
+[log]
+level = "info"
+
+[[projects]]
+name = "my-project"
+
+[projects.agent]
+# This build ships: %s
+type = "claudecode"
+
+[projects.agent.options]
+# The directory the agent works in. It must exist — magpie will not create it.
+work_dir = "/path/to/your/project"
+mode = "default"
+# model = "claude-sonnet-4-20250514"
+
+# --- Choose at least one platform below. This build ships: %s ---
+
+# Feishu / Lark (WebSocket, no public IP needed).
+# Run 'magpie feishu setup' to fill these in without leaving the terminal.
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "your-feishu-app-id"
+app_secret = "your-feishu-app-secret"
+
+# Every option, annotated: magpie config example
+`, quotedNames(core.ListRegisteredAgents()), quotedNames(core.ListRegisteredPlatforms()))
+}
+
 // usageText builds the --help output. It is separate from printUsage so tests
 // can assert on it without capturing stderr.
 func usageText() string {

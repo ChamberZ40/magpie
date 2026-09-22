@@ -21,18 +21,37 @@ walk away from the desk, and you steer it from your phone.
 
 ## Quick start
 
-Assumes Go 1.25+ and Node.js (the build embeds a Web UI), and an agent CLI that
-is already installed **and logged in** — see [Install](#install) for both.
+The fastest route is the npm package — it fetches a prebuilt binary, so you
+need neither Go nor Node's build toolchain:
+
+```bash
+npm install -g @z40/magpie
+```
+
+To build from source instead, you need Go 1.25+ and Node.js (the build embeds
+a Web UI) — see [Install](#install):
 
 ```bash
 git clone https://github.com/ChamberZ40/magpie.git
 cd magpie
 make build                 # produces ./magpie
-./magpie                   # writes ~/.magpie/config.toml, prints http://localhost:9820
 ```
 
-Open that URL, create a project, paste your bot credentials, save. Magpie
-hot-reloads. Message the bot to confirm the round trip works.
+Either way, you also need an agent CLI that is installed **and logged in** —
+magpie spawns it as a subprocess and inherits its credentials. Then:
+
+```bash
+magpie                     # writes ~/.magpie/config.toml and exits
+```
+
+Open that file: set `work_dir` to the directory the agent should work in (it
+must already exist), and add your bot credentials — `magpie feishu setup` does
+the Feishu half for you, and `magpie config example` prints every option,
+annotated. Then run `magpie` again and message the bot to confirm the round
+trip works.
+
+To enable the Web admin UI once the bridge is running, use `magpie web`, or
+`/web setup` from the chat.
 
 
 ## What's included
