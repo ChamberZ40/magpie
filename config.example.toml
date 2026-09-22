@@ -51,11 +51,11 @@
 # --file/--image/--audio/--video` and the /send API. Default: 50 (i.e. 50 MiB).
 # Set 0 to keep the default. Raise it to send larger files; the /send request
 # body limit scales with this value to fit base64-encoded attachments.
-# Can also be overridden by the CC_MAX_ATTACHMENT_SIZE_MB env var (same MiB
+# Can also be overridden by the MAGPIE_MAX_ATTACHMENT_SIZE_MB env var (same MiB
 # unit; takes precedence over this option when set).
 # `magpie send` 单个附件的最大大小（单位 MiB）。默认 50（即 50 MiB），设 0 保持默认。
 # 调大可发送更大文件；/send 请求体上限会随之按 base64 膨胀自动放大。
-# 也可用环境变量 CC_MAX_ATTACHMENT_SIZE_MB 覆盖（同样单位 MiB；设置后优先级高于本配置项）。
+# 也可用环境变量 MAGPIE_MAX_ATTACHMENT_SIZE_MB 覆盖（同样单位 MiB；设置后优先级高于本配置项）。
 # max_attachment_size_mb = 50
 
 [log]
@@ -480,15 +480,15 @@ level = "info" # debug, info, warn, error
 #   *                  — match all events / 匹配所有事件
 #
 # Handler types / 处理器类型:
-#   command — run a shell command; event context in CC_HOOK_* env vars
-#           — 执行 Shell 命令；事件上下文通过 CC_HOOK_* 环境变量传递
+#   command — run a shell command; event context in MAGPIE_HOOK_* env vars
+#           — 执行 Shell 命令；事件上下文通过 MAGPIE_HOOK_* 环境变量传递
 #   http    — POST JSON to a URL with event payload
 #           — 向 URL 发送 POST JSON 请求，包含事件数据
 #
 # [[hooks]]
 # event = "message.received"
 # type = "command"
-# command = "echo $CC_HOOK_USER_NAME >> /tmp/cc-messages.log"
+# command = "echo $MAGPIE_HOOK_USER_NAME >> /tmp/cc-messages.log"
 # async = true                    # default true; set false to block until done
 # timeout = 10                    # seconds; default 10s for command, 5s for http
 #

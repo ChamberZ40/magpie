@@ -380,7 +380,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	// --permission-prompt-tool stdio is active). magpie runs the
 	// hook itself without this env var, so the real work happens only
 	// once.
-	env = core.MergeEnv(env, []string{"MAGPIE_PERMISSION_HOOK_SKIP=1"})
+	env = core.MergeEnv(env, permissionHookSkipEnv())
 	// Carry the intended working directory across the sudo -i boundary so the
 	// re-chdir wrapper in BuildSpawnCommand can restore it (sudo -i would
 	// otherwise leave the agent in the target user's HOME). Only meaningful

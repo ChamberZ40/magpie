@@ -357,7 +357,7 @@ When the user asks you to do something on a schedule (e.g. "every day at 6am",
 
   magpie cron add --cron "<min> <hour> <day> <month> <weekday>" --prompt "<task description>" --desc "<short label>"
 
-Environment variables CC_PROJECT and CC_SESSION_KEY are already set — do NOT
+Environment variables MAGPIE_PROJECT and MAGPIE_SESSION_KEY are already set — do NOT
 specify --project or --session-key.
 
 Examples:

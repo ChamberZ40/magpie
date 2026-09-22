@@ -636,13 +636,16 @@ If your hook is rule-based (e.g. "deny `rm -rf`"), running twice is harmless. Bu
 
 ```bash
 #!/bin/bash
-if [ -n "$CC_CONNECT_PERMISSION_HOOK_SKIP" ]; then
+if [ -n "$MAGPIE_PERMISSION_HOOK_SKIP" ]; then
   exit 0  # magpie will re-run us without this flag
 fi
 # ... your actual hook logic ...
 ```
 
-magpie sets `CC_CONNECT_PERMISSION_HOOK_SKIP=1` in the Claude Code subprocess environment. When your hook sees this variable, it's running inside Claude Code (result will be discarded) — skip the expensive work. magpie strips this variable when it runs the hook itself, so the second execution proceeds normally.
+magpie sets `MAGPIE_PERMISSION_HOOK_SKIP=1` in the Claude Code subprocess environment. When your hook sees this variable, it's running inside Claude Code (result will be discarded) — skip the expensive work. magpie strips this variable when it runs the hook itself, so the second execution proceeds normally.
+
+> The pre-rename name `CC_PERMISSION_HOOK_SKIP` is still set alongside it, so an
+> existing hook script keeps working. New scripts should use the `MAGPIE_` name.
 
 ---
 
@@ -781,7 +784,7 @@ Notes:
 - `--image` and `--file` can both be repeated.
 - Absolute paths are recommended so the command does not depend on the agent's current working directory.
 - With `attachment_send = "off"`, image/file send-back is blocked but ordinary text replies still work.
-- Each attachment is capped at **50 MiB** by default. Configure it with `max_attachment_size_mb` (MiB) in config.toml, or override that value with the `CC_MAX_ATTACHMENT_SIZE_MB` env var (same MiB unit; takes precedence when set), e.g. `CC_MAX_ATTACHMENT_SIZE_MB=100 magpie send --file big.bin`.
+- Each attachment is capped at **50 MiB** by default. Configure it with `max_attachment_size_mb` (MiB) in config.toml, or override that value with the `MAGPIE_MAX_ATTACHMENT_SIZE_MB` env var (same MiB unit; takes precedence when set), e.g. `MAGPIE_MAX_ATTACHMENT_SIZE_MB=100 magpie send --file big.bin`.
 
 ### Typical use cases
 

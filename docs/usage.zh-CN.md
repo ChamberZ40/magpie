@@ -551,13 +551,15 @@ magpie 使用 `--permission-prompt-tool stdio` 模式启动 Claude Code，这意
 
 ```bash
 #!/bin/bash
-if [ -n "$CC_CONNECT_PERMISSION_HOOK_SKIP" ]; then
+if [ -n "$MAGPIE_PERMISSION_HOOK_SKIP" ]; then
   exit 0  # magpie 会在不含此变量的环境下重新执行我们
 fi
 # ... 你的 hook 逻辑 ...
 ```
 
-magpie 启动 Claude Code 子进程时会在环境中设置 `CC_CONNECT_PERMISSION_HOOK_SKIP=1`。当你的 hook 检测到这个变量时，说明它运行在 Claude Code 内部（结果会被丢弃）——跳过昂贵的逻辑即可。magpie 在自己执行 hook 时会剥离这个变量，所以第二次执行会正常运行。
+magpie 启动 Claude Code 子进程时会在环境中设置 `MAGPIE_PERMISSION_HOOK_SKIP=1`。当你的 hook 检测到这个变量时，说明它运行在 Claude Code 内部（结果会被丢弃）——跳过昂贵的逻辑即可。magpie 在自己执行 hook 时会剥离这个变量，所以第二次执行会正常运行。
+
+> 改名前的 `CC_PERMISSION_HOOK_SKIP` 仍会一并设置，已有的 hook 脚本无需改动；新脚本请使用 `MAGPIE_` 名称。
 
 ---
 
@@ -694,7 +696,7 @@ magpie send --tts "你好"
 - `--image` 和 `--file` 都可以重复多次。
 - 建议使用绝对路径，避免 Agent 当前工作目录变化导致找不到文件。
 - 如果设置了 `attachment_send = "off"`，图片/文件回传会被拒绝，但普通文本回复仍然正常。
-- 每个附件默认上限 **50 MiB**。可在 config.toml 用 `max_attachment_size_mb`（单位 MiB）调整，或用环境变量 `CC_MAX_ATTACHMENT_SIZE_MB` 覆盖该值（同样单位 MiB，设置后优先级更高），例如 `CC_MAX_ATTACHMENT_SIZE_MB=100 magpie send --file big.bin`。
+- 每个附件默认上限 **50 MiB**。可在 config.toml 用 `max_attachment_size_mb`（单位 MiB）调整，或用环境变量 `MAGPIE_MAX_ATTACHMENT_SIZE_MB` 覆盖该值（同样单位 MiB，设置后优先级更高），例如 `MAGPIE_MAX_ATTACHMENT_SIZE_MB=100 magpie send --file big.bin`。
 
 ### 典型场景
 

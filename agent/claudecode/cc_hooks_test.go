@@ -227,6 +227,39 @@ func TestRunHookCommand(t *testing.T) {
 			t.Errorf("behavior = %q, want allow (skip flag was not stripped)", decision.Behavior)
 		}
 	})
+
+	// A hook written against the pre-rename name must be stripped too, or it
+	// sees a stale "1" from our own environment and skips on the one run whose
+	// result we actually use.
+	t.Run("env strips the legacy skip flag", func(t *testing.T) {
+		t.Setenv("CC_PERMISSION_HOOK_SKIP", "1")
+		decision, err := runHookCommand(context.Background(),
+			`if [ -n "$CC_PERMISSION_HOOK_SKIP" ]; then echo deny; else echo allow; fi`, map[string]any{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if decision.Behavior != "allow" {
+			t.Errorf("behavior = %q, want allow (legacy skip flag was not stripped)", decision.Behavior)
+		}
+	})
+}
+
+// The skip flag goes to a hook script the user wrote, which lives outside this
+// repository and cannot be updated in the same commit as the rename. Emitting
+// only the current name silently breaks every such script: it never sees the
+// flag, so it does the expensive work on the run whose result is discarded.
+func TestPermissionHookSkipEnvCarriesBothNames(t *testing.T) {
+	env := permissionHookSkipEnv()
+
+	want := []string{"MAGPIE_PERMISSION_HOOK_SKIP=1", "CC_PERMISSION_HOOK_SKIP=1"}
+	if len(env) != len(want) {
+		t.Fatalf("env = %v, want %d entries", env, len(want))
+	}
+	for i, w := range want {
+		if env[i] != w {
+			t.Errorf("env[%d] = %q, want %q", i, env[i], w)
+		}
+	}
 }
 
 func TestTryHook(t *testing.T) {
