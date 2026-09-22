@@ -1,6 +1,6 @@
 {
   "name": "@z40/magpie",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Bridge local AI coding agents (Claude Code, Codex, Cursor, GitHub Copilot, any ACP agent) to messaging platforms (Feishu/Lark, WeChat Work, Weixin)",
   "keywords": [
     "claude-code",

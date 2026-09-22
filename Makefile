@@ -7,7 +7,7 @@ DIST       := dist
 # step with npm/package.json: the npm wrapper compares `magpie --version` to the
 # packaged version and re-downloads the release archive when the binary looks
 # older. Override on the command line for one-off builds.
-VERSION := v1.0.0
+VERSION := v1.0.1
 COMMIT     := $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 
