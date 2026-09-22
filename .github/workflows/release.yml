@@ -41,16 +41,19 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
+      # web/embed.go embeds `all:dist`, so the web package does not compile —
+      # and `go test ./...` does not even build — until the UI is built once.
+      # Install from web/pnpm-lock.yaml rather than letting `make web` fall
+      # back to `npm install`, so the shipped UI comes from the same dependency
+      # tree CI tests against.
+      - name: Build web assets
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
       - name: Run tests
         run: go test ./...
-
-      # `make web` falls back to `npm install` when web/node_modules is
-      # missing, which would ignore pnpm-lock.yaml and resolve versions CI
-      # never tested. Populate node_modules from the lockfile first; the
-      # `npm run build` inside `make web` is happy with a pnpm tree.
-      - name: Install web dependencies
-        working-directory: web
-        run: pnpm install --frozen-lockfile
 
       - name: Build release archives
         run: make release-all VERSION="${GITHUB_REF_NAME}"
