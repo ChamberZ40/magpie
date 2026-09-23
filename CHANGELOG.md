@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- **The Feishu chat list previewed "🧠 推理 (2)" instead of the reply.** The rich card set no `config.summary`, so Feishu derived the preview from the first text-bearing element — and the card puts the collapsible panels before the markdown body. Every card now carries an explicit summary: the reply stripped to one line, or the header status while the reply is still empty.
 - **Config reload dropped the streaming pacing.** `reloadConfig` rebuilt `DisplayCfg` without the streaming thresholds, and an omitted field is not a compile error — it silently resolved back to the built-in defaults. Editing `[display.streaming]` and reloading therefore restored the old pacing with no warning. Both assembly sites now wire it, and a test fails on any future `DisplayCfg` literal that forgets.
 
 ### Changed

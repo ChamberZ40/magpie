@@ -6655,6 +6655,20 @@ func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.To
 		cardConfig["streaming_config"] = pacing
 	}
 
+	// The chat-list preview. Feishu picks it from the first text-bearing
+	// element when this is unset, and the panels come before the body, so
+	// without it a finished turn previews as "🧠 推理 (2)". While the reply is
+	// still empty the header is the honest stand-in; a done card has no header
+	// title, so a turn that answered only inside the panels keeps Feishu's own
+	// fallback rather than getting a blank row.
+	summary := richCardSummaryText(markdown)
+	if summary == "" {
+		summary = headerTitle
+	}
+	if summary != "" {
+		cardConfig["summary"] = map[string]any{"content": summary}
+	}
+
 	card := map[string]any{
 		"schema": "2.0",
 		"config": cardConfig,
