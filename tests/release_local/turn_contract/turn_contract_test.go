@@ -393,7 +393,7 @@ func TestThinkingAndToolEventsContract(t *testing.T) {
 	engine.SetDisplayConfig(core.DisplayCfg{
 		Mode:             "full",
 		ThinkingMessages: true,
-		ToolMessages:     true,
+		ToolDetail:       core.ToolDetailFull,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
 	})
@@ -432,7 +432,7 @@ func TestHiddenToolEventsContractKeepsFinalAndHidesToolDetails(t *testing.T) {
 	engine.SetDisplayConfig(core.DisplayCfg{
 		Mode:             "full",
 		ThinkingMessages: true,
-		ToolMessages:     false,
+		ToolDetail:       core.ToolDetailNone,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
 	})
@@ -779,14 +779,17 @@ func TestDisplayVisibilityConfigurationMatrix(t *testing.T) {
 	tests := []struct {
 		name         string
 		thinking     bool
-		tools        bool
+		tools        string
 		wantThinking bool
 		wantTool     bool
 	}{
-		{name: "show_both", thinking: true, tools: true, wantThinking: true, wantTool: true},
-		{name: "hide_thinking", thinking: false, tools: true, wantTool: true},
-		{name: "hide_tools", thinking: true, tools: false, wantThinking: true},
-		{name: "hide_both", thinking: false, tools: false},
+		{name: "show_both", thinking: true, tools: core.ToolDetailFull, wantThinking: true, wantTool: true},
+		{name: "hide_thinking", thinking: false, tools: core.ToolDetailFull, wantTool: true},
+		{name: "hide_tools", thinking: true, tools: core.ToolDetailNone, wantThinking: true},
+		{name: "hide_both", thinking: false, tools: core.ToolDetailNone},
+		// The default level still puts tool progress on screen; it only drops
+		// the status line and the raw output, which this matrix does not check.
+		{name: "summary_still_shows_tools", thinking: true, tools: core.ToolDetailSummary, wantThinking: true, wantTool: true},
 	}
 
 	for _, tt := range tests {
@@ -796,7 +799,7 @@ func TestDisplayVisibilityConfigurationMatrix(t *testing.T) {
 				Mode:             "full",
 				CardMode:         "legacy",
 				ThinkingMessages: tt.thinking,
-				ToolMessages:     tt.tools,
+				ToolDetail:       tt.tools,
 				ThinkingMaxLen:   300,
 				ToolMaxLen:       500,
 			})
@@ -839,7 +842,7 @@ func TestRichCardModeKeepsToolStepsAndFinalMetadataInOneCard(t *testing.T) {
 		Mode:             "full",
 		CardMode:         "rich",
 		ThinkingMessages: true,
-		ToolMessages:     true,
+		ToolDetail:       core.ToolDetailFull,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
 	})

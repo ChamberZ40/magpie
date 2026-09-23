@@ -124,7 +124,18 @@ level = "info" # debug, info, warn, error
 # thinking_max_len = 300    # Max chars for thinking messages (default: 300) / 思考消息最大字符数（默认 300）
 # tool_max_len = 500        # Max chars for tool use messages (default: 500) / 工具调用消息最大字符数（默认 500）
 # history_max_len = 1000    # Max chars per /history entry (default: 1000; 0 = no truncation) / 每条历史记录最大字符数（默认 1000；0 表示不截断）
-# tool_messages = true      # Show/hide tool progress messages (default: true) / 是否显示工具进度消息（默认 true）
+# card_mode = "legacy"      # Card style: "legacy" (default, one message per event) or "rich" (Card 2.0, one live card per turn)
+#                           # 卡片样式："legacy"（默认，每个事件一条消息）或 "rich"（Card 2.0，整轮共用一张实时卡片）
+#                           # "rich" currently only changes Feishu; other platforms ignore it.
+#                           # 目前仅飞书区分两者，其他平台忽略该项。
+# tool_detail = "summary"   # How much of each tool call is shown / 每次工具调用显示多少内容
+#                           # none: tool calls are not shown at all / 完全不显示工具调用
+#                           # summary: tool name + a one-line summary (default) / 工具名 + 一行摘要（默认）
+#                           # full: plus status, exit code and the raw output / 额外带状态、退出码和原始输出
+#                           # Not the same knob as mode = "full": mode decides whether tool
+#                           # events are shown at all, tool_detail decides how much of each.
+#                           # 和 mode = "full" 不是一回事：mode 决定工具事件显不显示，
+#                           # tool_detail 决定每次显示多少。可用 /verbose 在聊天里临时切换。
 # show_context_indicator = true  # Show "[ctx: ~N%]" suffix on assistant replies (default: true)
 #                                # 在助手回复末尾显示「[ctx: ~N%]」上下文占用提示（默认 true 显示）
 # reply_footer = true            # Show Codex-like footer on assistant replies (default: true)
@@ -183,7 +194,8 @@ level = "info" # debug, info, warn, error
 # name = "noisy-project"
 # [projects.display]
 # thinking_messages = false  # Override only this field; others inherit from global
-# tool_messages = false
+# tool_detail = "none"       # Beware: /verbose writes the global [display], which this outranks
+#                            # 注意：/verbose 写的是全局 [display]，重载后本项优先
 # hide_agent_footer = true   # Hide agent-emitted model/token footer only for this project
 
 # Agent idle timeout: max minutes between consecutive agent events before

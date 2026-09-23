@@ -77,7 +77,6 @@ export default function GlobalSettings() {
   const [idleTimeout, setIdleTimeout] = useState(120);
   const [thinkingMessages, setThinkingMessages] = useState(true);
   const [thinkingMaxLen, setThinkingMaxLen] = useState(300);
-  const [toolMessages, setToolMessages] = useState(true);
   const [toolMaxLen, setToolMaxLen] = useState(500);
   const [spEnabled, setSpEnabled] = useState(true);
   const [spInterval, setSpInterval] = useState(1500);
@@ -94,7 +93,6 @@ export default function GlobalSettings() {
       setIdleTimeout(s.idle_timeout_mins ?? 120);
       setThinkingMessages(s.thinking_messages ?? true);
       setThinkingMaxLen(s.thinking_max_len ?? 300);
-      setToolMessages(s.tool_messages ?? true);
       setToolMaxLen(s.tool_max_len ?? 500);
       setSpEnabled(s.stream_preview_enabled ?? true);
       setSpInterval(s.stream_preview_interval_ms ?? 1500);
@@ -120,7 +118,6 @@ export default function GlobalSettings() {
         idle_timeout_mins: idleTimeout,
         thinking_messages: thinkingMessages,
         thinking_max_len: thinkingMaxLen,
-        tool_messages: toolMessages,
         tool_max_len: toolMaxLen,
         stream_preview_enabled: spEnabled,
         stream_preview_interval_ms: spInterval,
@@ -191,12 +188,6 @@ export default function GlobalSettings() {
             onChange={setThinkingMaxLen}
             min={0}
             hint={t('settings.thinkingMaxLenHint', 'Max characters for thinking messages; 0 = no truncation')}
-          />
-          <Toggle
-            label={t('settings.toolMessages', 'Tool progress')}
-            value={toolMessages}
-            onChange={setToolMessages}
-            hint={t('settings.toolMessagesHint', 'Show or hide tool progress messages')}
           />
           <NumberInput
             label={t('settings.toolMaxLen', 'Tool max length')}

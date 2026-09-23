@@ -397,6 +397,7 @@ Typed in chat, not in a shell.
 /mode [name]                Show or switch permission mode
 /model [switch <alias>]     List or switch model
 /provider [switch <name>]   List or switch API provider
+/verbose [none|summary|full]  How much of each tool call is shown
 /git [subcommand]           Read-only repository queries
 /cron, /timer               Recurring and one-shot scheduled tasks
 /cancel                     Interrupt the current turn

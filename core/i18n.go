@@ -192,6 +192,10 @@ const (
 	MsgPermissionHint            MsgKey = "permission_hint"
 	MsgQuietOn                   MsgKey = "quiet_on"
 	MsgQuietOff                  MsgKey = "quiet_off"
+	MsgVerboseCurrent            MsgKey = "verbose_current"
+	MsgVerboseSet                MsgKey = "verbose_set"
+	MsgVerboseUsage              MsgKey = "verbose_usage"
+	MsgVerboseProjectOverride    MsgKey = "verbose_project_override"
 	MsgDisplayModeCompact        MsgKey = "display_mode_compact"
 	MsgQuietGlobalOn             MsgKey = "quiet_global_on"
 	MsgQuietGlobalOff            MsgKey = "quiet_global_off"
@@ -331,7 +335,7 @@ const (
 	MsgStatusSession          MsgKey = "status_session"
 	MsgStatusCron             MsgKey = "status_cron"
 	MsgStatusThinkingMessages MsgKey = "status_thinking_messages"
-	MsgStatusToolMessages     MsgKey = "status_tool_messages"
+	MsgStatusToolDetail       MsgKey = "status_tool_detail"
 	MsgStatusSessionKey       MsgKey = "status_session_key"
 	MsgStatusAgentSID         MsgKey = "status_agent_sid"
 	MsgStatusUserID           MsgKey = "status_user_id"
@@ -576,6 +580,7 @@ const (
 	MsgBuiltinCmdMode      MsgKey = "mode"
 	MsgBuiltinCmdLang      MsgKey = "lang"
 	MsgBuiltinCmdQuiet     MsgKey = "quiet"
+	MsgBuiltinCmdVerbose   MsgKey = "verbose"
 	MsgBuiltinCmdCompress  MsgKey = "compress"
 	MsgBuiltinCmdStop      MsgKey = "stop"
 	MsgBuiltinCmdCron      MsgKey = "cron"
@@ -918,6 +923,59 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "🔔 安靜模式已關閉 — 將恢復推送思考和工具調用進度訊息。",
 		LangJapanese:           "🔔 静音モード OFF — 思考とツール実行の進捗メッセージを表示します。",
 		LangSpanish:            "🔔 Modo silencioso desactivado — los mensajes de progreso se mostrarán.",
+	},
+	MsgVerboseCurrent: {
+		LangEnglish:            "🔧 Tool detail: %s — use `/verbose <none|summary|full>` to change it.",
+		LangChinese:            "🔧 工具详略: %s — 用 `/verbose <none|summary|full>` 修改。",
+		LangTraditionalChinese: "🔧 工具詳略: %s — 用 `/verbose <none|summary|full>` 修改。",
+		LangJapanese:           "🔧 ツール詳細度: %s — 変更は `/verbose <none|summary|full>` で。",
+		LangSpanish:            "🔧 Detalle de herramientas: %s — use `/verbose <none|summary|full>` para cambiarlo.",
+	},
+	MsgVerboseSet: {
+		LangEnglish:            "🔧 Tool detail set to %s.",
+		LangChinese:            "🔧 工具详略已设为 %s。",
+		LangTraditionalChinese: "🔧 工具詳略已設為 %s。",
+		LangJapanese:           "🔧 ツール詳細度を %s に設定しました。",
+		LangSpanish:            "🔧 Detalle de herramientas establecido en %s.",
+	},
+	MsgVerboseUsage: {
+		LangEnglish: "Usage: `/verbose [none|summary|full]`\n" +
+			"• none — tool calls are not shown at all\n" +
+			"• summary — tool name and a one-line summary (default)\n" +
+			"• full — plus status, exit code and raw output\n" +
+			"Without an argument it only reports the current level.\n" +
+			"This is not the display mode from `/quiet`: mode decides whether tool events are shown, /verbose decides how much of each one.",
+		LangChinese: "用法: `/verbose [none|summary|full]`\n" +
+			"• none — 完全不显示工具调用\n" +
+			"• summary — 工具名 + 一行摘要（默认）\n" +
+			"• full — 额外带状态、退出码和原始输出\n" +
+			"不带参数时只回报当前档位。\n" +
+			"这和 `/quiet` 的显示模式不是一回事: 模式决定工具调用显不显示，/verbose 决定每次显示多少。",
+		LangTraditionalChinese: "用法: `/verbose [none|summary|full]`\n" +
+			"• none — 完全不顯示工具調用\n" +
+			"• summary — 工具名 + 一行摘要（預設）\n" +
+			"• full — 額外帶狀態、退出碼和原始輸出\n" +
+			"不帶參數時只回報當前檔位。\n" +
+			"這和 `/quiet` 的顯示模式不是一回事: 模式決定工具調用顯不顯示，/verbose 決定每次顯示多少。",
+		LangJapanese: "使い方: `/verbose [none|summary|full]`\n" +
+			"• none — ツール呼び出しを表示しない\n" +
+			"• summary — ツール名と 1 行の要約（既定）\n" +
+			"• full — さらにステータス・終了コード・生出力\n" +
+			"引数なしの場合は現在の設定を表示するだけです。\n" +
+			"`/quiet` の表示モードとは別物です: モードはツールを表示するかどうか、/verbose は 1 件あたりどこまで表示するかを決めます。",
+		LangSpanish: "Uso: `/verbose [none|summary|full]`\n" +
+			"• none — las llamadas a herramientas no se muestran\n" +
+			"• summary — nombre de la herramienta y un resumen de una línea (predeterminado)\n" +
+			"• full — además estado, código de salida y salida cruda\n" +
+			"Sin argumento solo informa del nivel actual.\n" +
+			"No es el modo de visualización de `/quiet`: el modo decide si se muestran las herramientas, /verbose decide cuánto de cada una.",
+	},
+	MsgVerboseProjectOverride: {
+		LangEnglish:            "\n⚠️ This project sets its own `tool_detail`, which wins on reload — edit `[projects.display]` to make the change stick.",
+		LangChinese:            "\n⚠️ 本项目自带 `tool_detail`，重载后以它为准 — 要长期生效请改 `[projects.display]`。",
+		LangTraditionalChinese: "\n⚠️ 本專案自帶 `tool_detail`，重載後以它為準 — 要長期生效請改 `[projects.display]`。",
+		LangJapanese:           "\n⚠️ このプロジェクトは独自の `tool_detail` を持ち、再読み込み時に優先されます — 恒久的に変えるには `[projects.display]` を編集してください。",
+		LangSpanish:            "\n⚠️ Este proyecto define su propio `tool_detail`, que prevalece al recargar — edite `[projects.display]` para que el cambio persista.",
 	},
 	MsgDisplayModeCompact: {
 		LangEnglish:            "📋 Compact mode — thinking/tool hidden, each text segment sent separately.",
@@ -2437,12 +2495,12 @@ var messages = map[MsgKey]map[Language]string{
 		LangJapanese:           "思考メッセージ: %s\n",
 		LangSpanish:            "Mensajes de razonamiento: %s\n",
 	},
-	MsgStatusToolMessages: {
-		LangEnglish:            "Tool progress: %s\n",
-		LangChinese:            "工具进度: %s\n",
-		LangTraditionalChinese: "工具進度: %s\n",
-		LangJapanese:           "ツール進捗: %s\n",
-		LangSpanish:            "Progreso de herramientas: %s\n",
+	MsgStatusToolDetail: {
+		LangEnglish:            "Tool detail: %s\n",
+		LangChinese:            "工具详略: %s\n",
+		LangTraditionalChinese: "工具詳略: %s\n",
+		LangJapanese:           "ツール詳細度: %s\n",
+		LangSpanish:            "Detalle de herramientas: %s\n",
 	},
 	MsgStatusSessionKey: {
 		LangEnglish:            "Session Key: `%s`\n",
@@ -3649,6 +3707,13 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "開關思考和工具進度訊息, 參數: [global]",
 		LangJapanese:           "思考/ツール進捗メッセージの表示切替, 引数: [global]",
 		LangSpanish:            "Alternar mensajes de progreso, arg: [global]",
+	},
+	MsgBuiltinCmdVerbose: {
+		LangEnglish:            "View/set tool call detail, arg: [none|summary|full]",
+		LangChinese:            "查看/设置工具调用详略, 参数: [none|summary|full]",
+		LangTraditionalChinese: "查看/設置工具調用詳略, 參數: [none|summary|full]",
+		LangJapanese:           "ツール呼び出しの詳細度の表示/設定, 引数: [none|summary|full]",
+		LangSpanish:            "Ver/definir el detalle de herramientas, arg: [none|summary|full]",
 	},
 	MsgBuiltinCmdCompress: {
 		LangEnglish:            "Compress conversation context",

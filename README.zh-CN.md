@@ -374,6 +374,7 @@ go build -tags 'no_weixin no_wecom' ./cmd/magpie   # 不用 Make
 /mode [name]                查看或切换权限模式
 /model [switch <alias>]     查看或切换模型
 /provider [switch <name>]   查看或切换 API Provider
+/verbose [none|summary|full]  工具调用显示多少内容
 /git [子命令]               只读的仓库查询
 /cron, /timer               周期任务与一次性延时任务
 /cancel                     打断当前这轮

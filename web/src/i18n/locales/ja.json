@@ -340,8 +340,6 @@
     "thinkingMessagesHint": "中間思考プロセスの表示・非表示を切替",
     "thinkingMaxLen": "思考の最大文字数",
     "thinkingMaxLenHint": "思考メッセージの最大文字数；0 = 制限なし",
-    "toolMessages": "ツール進捗",
-    "toolMessagesHint": "ツール呼び出し進捗メッセージの表示・非表示を切替",
     "toolMaxLen": "ツールの最大文字数",
     "toolMaxLenHint": "ツール使用メッセージの最大文字数；0 = 制限なし",
     "streamPreview": "ストリームプレビュー",

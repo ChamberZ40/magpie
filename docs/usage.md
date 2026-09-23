@@ -45,6 +45,7 @@ Each user gets an independent session with full conversation context. Manage ses
 | `/allow <tool>` | Pre-allow a tool (next session) |
 | `/reasoning [level]` | View or switch reasoning effort (Codex) |
 | `/mode [name]` | View or switch permission mode |
+| `/verbose [none\|summary\|full]` | Show or set how much of each tool call is displayed (default `summary`; bare `/verbose` only reports) |
 | `/stop` | Stop current execution |
 | `/help` | Show available commands |
 

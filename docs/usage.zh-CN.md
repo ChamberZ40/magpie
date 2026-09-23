@@ -47,6 +47,7 @@ magpie 完整功能使用指南。
 | `/allow <工具名>` | 预授权工具 |
 | `/reasoning [等级]` | 查看或切换推理强度（Codex）|
 | `/mode [名称]` | 查看或切换权限模式 |
+| `/verbose [none\|summary\|full]` | 查看或设置工具调用的显示详略（默认 `summary`；不带参数只回报当前值）|
 | `/stop` | 停止当前执行 |
 | `/help` | 显示可用命令 |
 

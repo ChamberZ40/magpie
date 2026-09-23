@@ -340,8 +340,6 @@
     "thinkingMessagesHint": "显示或隐藏中间思考过程消息",
     "thinkingMaxLen": "思考最大长度",
     "thinkingMaxLenHint": "思考消息的最大字符数；0 = 不截断",
-    "toolMessages": "工具进度",
-    "toolMessagesHint": "显示或隐藏工具调用进度消息",
     "toolMaxLen": "工具最大长度",
     "toolMaxLenHint": "工具调用消息的最大字符数；0 = 不截断",
     "streamPreview": "流式预览",

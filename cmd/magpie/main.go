@@ -545,14 +545,15 @@ func main() {
 			historyMaxLen := config.EffectiveHistoryMaxLen(cfg, &proj)
 			streaming := config.EffectiveStreaming(cfg, &proj)
 			engine.SetDisplayConfig(core.DisplayCfg{
-				Mode:             mode,
-				CardMode:         config.EffectiveCardMode(cfg, &proj),
-				ThinkingMessages: tm,
-				ThinkingMaxLen:   tmlen,
-				ToolMaxLen:       toollen,
-				ToolMessages:     tool,
-				HistoryMaxLen:    &historyMaxLen,
-				HideAgentFooter:  hideAgentFooter,
+				Mode:                  mode,
+				CardMode:              config.EffectiveCardMode(cfg, &proj),
+				ThinkingMessages:      tm,
+				ThinkingMaxLen:        tmlen,
+				ToolMaxLen:            toollen,
+				ToolDetail:            tool,
+				ToolDetailFromProject: projectPinsToolDetail(&proj),
+				HistoryMaxLen:         &historyMaxLen,
+				HideAgentFooter:       hideAgentFooter,
 				Streaming: core.StreamingCfg{
 					Throttle:         time.Duration(streaming.ThrottleMS) * time.Millisecond,
 					ThrottleChars:    streaming.ThrottleChars,
@@ -666,8 +667,8 @@ func main() {
 			}
 		}
 
-		engine.SetDisplaySaveFunc(func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolMessages *bool) error {
-			return config.SaveDisplayConfig(mode, thinkingMessages, thinkingMaxLen, toolMaxLen, toolMessages)
+		engine.SetDisplaySaveFunc(func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolDetail *string) error {
+			return config.SaveDisplayConfig(mode, thinkingMessages, thinkingMaxLen, toolMaxLen, toolDetail)
 		})
 
 		// Wire idle timeout
@@ -1201,8 +1202,8 @@ func main() {
 				iv := int(v)
 				u.ThinkingMaxLen = &iv
 			}
-			if v, ok := updates["tool_messages"].(bool); ok {
-				u.ToolMessages = &v
+			if v, ok := updates["tool_detail"].(string); ok {
+				u.ToolDetail = &v
 			}
 			if v, ok := updates["tool_max_len"].(float64); ok {
 				iv := int(v)
@@ -1639,14 +1640,15 @@ func reloadConfig(configPath, projName string, engine *core.Engine) (*core.Confi
 	historyMaxLen := config.EffectiveHistoryMaxLen(cfg, proj)
 	streaming := config.EffectiveStreaming(cfg, proj)
 	engine.SetDisplayConfig(core.DisplayCfg{
-		Mode:             mode,
-		CardMode:         config.EffectiveCardMode(cfg, proj),
-		ThinkingMessages: tm,
-		ThinkingMaxLen:   tmlen,
-		ToolMaxLen:       toollen,
-		ToolMessages:     tool,
-		HistoryMaxLen:    &historyMaxLen,
-		HideAgentFooter:  hideAgentFooter,
+		Mode:                  mode,
+		CardMode:              config.EffectiveCardMode(cfg, proj),
+		ThinkingMessages:      tm,
+		ThinkingMaxLen:        tmlen,
+		ToolMaxLen:            toollen,
+		ToolDetail:            tool,
+		ToolDetailFromProject: projectPinsToolDetail(proj),
+		HistoryMaxLen:         &historyMaxLen,
+		HideAgentFooter:       hideAgentFooter,
 		Streaming: core.StreamingCfg{
 			Throttle:         time.Duration(streaming.ThrottleMS) * time.Millisecond,
 			ThrottleChars:    streaming.ThrottleChars,

@@ -332,6 +332,7 @@ func printBotMenuGuidance(platformType string) {
 	fmt.Println("   │   ├── /model    切换模型                    │")
 	fmt.Println("   │   ├── /mode     切换模式                    │")
 	fmt.Println("   │   ├── /quiet    静默模式                    │")
+	fmt.Println("   │   ├── /verbose 工具详略                    │")
 	fmt.Println("   │   ├── /lang     语言                        │")
 	fmt.Println("   │   └── /config   配置                        │")
 	fmt.Println("   │ 主菜单: 工具                                 │")

@@ -89,7 +89,7 @@ var ConfigPath string
 type Config struct {
 	DataDir        string `toml:"data_dir"` // session store directory, default ~/.magpie
 	AttachmentSend string `toml:"attachment_send"`
-	// Quiet is legacy: when true and [display] does not set thinking_messages / tool_messages,
+	// Quiet is legacy: when true and [display] does not set thinking_messages / tool_detail,
 	// engines behave as if those flags were false. Per-project quiet overrides when set.
 	Quiet              *bool                   `toml:"quiet,omitempty"`
 	Providers          []ProviderConfig        `toml:"providers"`                      // global shared providers
@@ -205,6 +205,33 @@ const (
 	DisplayModeQuiet   = "quiet"   // hide thinking/tool, all text appends to one card
 )
 
+// Tool detail levels. These replace the old boolean tool_messages, which could
+// only choose between "nothing" and "status line plus raw output".
+//
+// Note that ToolDetailFull and DisplayModeFull are unrelated: mode decides
+// whether tool events become their own messages, tool_detail decides how much
+// of each tool call is shown.
+const (
+	ToolDetailNone    = "none"    // tool calls are not shown at all
+	ToolDetailSummary = "summary" // tool name + a one-line summary (default)
+	ToolDetailFull    = "full"    // ... plus status, exit code and raw output
+)
+
+// ParseToolDetail normalizes a tool detail level, rejecting anything outside
+// the three known values. Used at the trust boundaries — the Management API
+// and chat commands — where a typo should be reported rather than swallowed.
+// Config-file resolution deliberately does not use this: EffectiveDisplay
+// falls back instead of refusing to start.
+func ParseToolDetail(s string) (string, error) {
+	switch level := strings.ToLower(strings.TrimSpace(s)); level {
+	case ToolDetailNone, ToolDetailSummary, ToolDetailFull:
+		return level, nil
+	default:
+		return "", fmt.Errorf("tool_detail must be %q, %q or %q, got %q",
+			ToolDetailNone, ToolDetailSummary, ToolDetailFull, s)
+	}
+}
+
 // DisplayConfig controls how intermediate messages (thinking, tool output) are shown.
 type DisplayConfig struct {
 	Mode                 *string `toml:"mode"`                   // "full" (default), "compact", or "quiet"
@@ -212,7 +239,7 @@ type DisplayConfig struct {
 	ThinkingMessages     *bool   `toml:"thinking_messages"`      // whether thinking messages are shown; default true
 	ThinkingMaxLen       *int    `toml:"thinking_max_len"`       // max chars for thinking messages; 0 = no truncation; default 300
 	ToolMaxLen           *int    `toml:"tool_max_len"`           // max chars for tool use messages; 0 = no truncation; default 500
-	ToolMessages         *bool   `toml:"tool_messages"`          // whether tool progress messages are shown; default true
+	ToolDetail           *string `toml:"tool_detail"`            // "none", "summary" (default) or "full"
 	HistoryMaxLen        *int    `toml:"history_max_len"`        // max chars per /history entry; 0 = no truncation; default 1000
 	ShowContextIndicator *bool   `toml:"show_context_indicator"` // whether [ctx: ~N%] suffix is shown; default true
 	ReplyFooter          *bool   `toml:"reply_footer"`           // whether Codex-like footer is shown; default true
@@ -584,7 +611,7 @@ type ProjectConfig struct {
 	// to keep existing configs working. Will be removed in a future release.
 	WorkspaceIdleTimeoutMinsLegacy *int `toml:"workspace_idle_timeout_mins,omitempty"`
 	// Quiet is legacy per-project override; see Config.Quiet. When true and global [display]
-	// omits thinking_messages / tool_messages, those default to off for this project.
+	// omits thinking_messages / tool_detail, those default to off for this project.
 	Quiet *bool `toml:"quiet,omitempty"`
 	// Display, when non-nil, overrides individual fields of the global [display]
 	// block for this project. Each sub-field is independently optional; unset
@@ -594,13 +621,13 @@ type ProjectConfig struct {
 	//
 	//   [display]
 	//   thinking_messages = true
-	//   tool_messages = true
+	//   tool_detail = "full"
 	//
 	//   [[projects]]
 	//   name = "noisy-project"
 	//   [projects.display]
 	//   thinking_messages = false
-	//   tool_messages = false
+	//   tool_detail = "none"
 	Display    *DisplayConfig  `toml:"display,omitempty"`
 	Observe    *ObserveConfig  `toml:"observe,omitempty"`
 	References ReferenceConfig `toml:"references,omitempty"`
@@ -875,11 +902,11 @@ func projectQuietEffective(cfg *Config, proj *ProjectConfig) bool {
 //  3. Legacy quiet = true (without display.mode) → "quiet".
 //  4. Default → "full".
 //
-// Resolution order for thinking_messages / tool_messages:
+// Resolution order for thinking_messages / tool_detail:
 //  1. project-level [projects.display].<field> (highest precedence)
 //  2. global [display].<field>
-//  3. mode-derived default (compact/quiet → false, full → true)
-func EffectiveDisplay(cfg *Config, proj *ProjectConfig) (mode string, thinkingMessages, toolMessages bool, thinkingMaxLen, toolMaxLen int, showContextIndicator, replyFooter, hideAgentFooter bool) {
+//  3. mode-derived default (compact/quiet → off, full → on)
+func EffectiveDisplay(cfg *Config, proj *ProjectConfig) (mode string, thinkingMessages bool, toolDetail string, thinkingMaxLen, toolMaxLen int, showContextIndicator, replyFooter, hideAgentFooter bool) {
 	var projDisp *DisplayConfig
 	if proj != nil {
 		projDisp = proj.Display
@@ -896,10 +923,10 @@ func EffectiveDisplay(cfg *Config, proj *ProjectConfig) (mode string, thinkingMe
 	}
 
 	// Mode-derived defaults.
-	thinkingDefault, toolDefault := true, true
+	thinkingDefault, toolDefault := true, ToolDetailSummary
 	switch mode {
 	case DisplayModeCompact, DisplayModeQuiet:
-		thinkingDefault, toolDefault = false, false
+		thinkingDefault, toolDefault = false, ToolDetailNone
 	}
 
 	pickBool := func(projVal, globalVal *bool, dflt bool) bool {
@@ -908,6 +935,21 @@ func EffectiveDisplay(cfg *Config, proj *ProjectConfig) (mode string, thinkingMe
 		}
 		if globalVal != nil {
 			return *globalVal
+		}
+		return dflt
+	}
+	// Unlike pickBool, an out-of-range value here is not representable in the
+	// type, so a typo falls through to the next source rather than disabling
+	// the tool panel outright. Matches EffectiveCardMode.
+	pickToolDetail := func(projVal, globalVal *string, dflt string) string {
+		for _, v := range []*string{projVal, globalVal} {
+			if v == nil {
+				continue
+			}
+			switch level := strings.ToLower(strings.TrimSpace(*v)); level {
+			case ToolDetailNone, ToolDetailSummary, ToolDetailFull:
+				return level
+			}
 		}
 		return dflt
 	}
@@ -939,9 +981,14 @@ func EffectiveDisplay(cfg *Config, proj *ProjectConfig) (mode string, thinkingMe
 		cfg.Display.ThinkingMessages,
 		thinkingDefault,
 	)
-	toolMessages = pickBool(
-		getProjBool(func(d *DisplayConfig) *bool { return d.ToolMessages }),
-		cfg.Display.ToolMessages,
+	toolDetail = pickToolDetail(
+		func() *string {
+			if projDisp == nil {
+				return nil
+			}
+			return projDisp.ToolDetail
+		}(),
+		cfg.Display.ToolDetail,
 		toolDefault,
 	)
 	thinkingMaxLen = pickInt(
@@ -1904,7 +1951,7 @@ func RemoveAlias(name string) error {
 
 // SaveDisplayConfig persists the display settings to the config file.
 // Uses surgical text editing to preserve comments and unknown fields.
-func SaveDisplayConfig(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolMessages *bool) error {
+func SaveDisplayConfig(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolDetail *string) error {
 	configMu.Lock()
 	defer configMu.Unlock()
 	if mode != nil {
@@ -1927,8 +1974,8 @@ func SaveDisplayConfig(mode *string, thinkingMessages *bool, thinkingMaxLen, too
 			return err
 		}
 	}
-	if toolMessages != nil {
-		if err := patchSectionField("display", "tool_messages", fmt.Sprintf("%t", *toolMessages)); err != nil {
+	if toolDetail != nil {
+		if err := patchSectionField("display", "tool_detail", quoteTomlString(*toolDetail)); err != nil {
 			return err
 		}
 	}
@@ -3895,10 +3942,10 @@ func GetGlobalSettings() map[string]any {
 	} else {
 		result["thinking_max_len"] = 300
 	}
-	if cfg.Display.ToolMessages != nil {
-		result["tool_messages"] = *cfg.Display.ToolMessages
+	if cfg.Display.ToolDetail != nil {
+		result["tool_detail"] = *cfg.Display.ToolDetail
 	} else {
-		result["tool_messages"] = true
+		result["tool_detail"] = ToolDetailSummary
 	}
 	if cfg.Display.ToolMaxLen != nil {
 		result["tool_max_len"] = *cfg.Display.ToolMaxLen
@@ -3949,7 +3996,7 @@ type GlobalSettingsUpdate struct {
 	IdleTimeoutMins    *int    `json:"idle_timeout_mins"`
 	ThinkingMessages   *bool   `json:"thinking_messages"`
 	ThinkingMaxLen     *int    `json:"thinking_max_len"`
-	ToolMessages       *bool   `json:"tool_messages"`
+	ToolDetail         *string `json:"tool_detail"`
 	ToolMaxLen         *int    `json:"tool_max_len"`
 	StreamPreviewOn    *bool   `json:"stream_preview_enabled"`
 	StreamPreviewIntMs *int    `json:"stream_preview_interval_ms"`
@@ -3991,8 +4038,12 @@ func SaveGlobalSettings(u GlobalSettingsUpdate) error {
 	if u.ThinkingMaxLen != nil {
 		cfg.Display.ThinkingMaxLen = u.ThinkingMaxLen
 	}
-	if u.ToolMessages != nil {
-		cfg.Display.ToolMessages = u.ToolMessages
+	if u.ToolDetail != nil {
+		level, err := ParseToolDetail(*u.ToolDetail)
+		if err != nil {
+			return err
+		}
+		cfg.Display.ToolDetail = &level
 	}
 	if u.ToolMaxLen != nil {
 		cfg.Display.ToolMaxLen = u.ToolMaxLen

@@ -1097,7 +1097,7 @@ func TestProcessInteractiveEvents_StripsAgentFooterWhenEnabled(t *testing.T) {
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 		HideAgentFooter:  true,
 	})
 
@@ -1343,7 +1343,7 @@ func TestProcessInteractiveEvents_ToolSegmentsKeepFinalFooter(t *testing.T) {
 	p := &stubPlatformEngine{n: "telegram"}
 	e := NewEngine("test", agent, []Platform{p}, "", LangEnglish)
 	e.SetReplyFooterEnabled(true)
-	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolMessages: true})
+	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolDetail: ToolDetailFull})
 
 	sessionKey := "telegram:user-tool-footer"
 	session := e.sessions.GetOrCreateActive(sessionKey)
@@ -1376,7 +1376,7 @@ func TestProcessInteractiveEvents_ToolSegmentsKeepFinalFooter(t *testing.T) {
 func TestProcessInteractiveEvents_DropsStandaloneEllipsisProgress(t *testing.T) {
 	p := &stubPlatformEngine{n: "telegram"}
 	e := NewEngine("test", &stubAgent{}, []Platform{p}, "", LangEnglish)
-	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolMessages: true})
+	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolDetail: ToolDetailFull})
 
 	sessionKey := "telegram:user-ellipsis"
 	session := e.sessions.GetOrCreateActive(sessionKey)
@@ -1585,7 +1585,7 @@ func TestProcessInteractiveEvents_HiddenToolProgressKeepsPreviewOnFinalize(t *te
 	p := &mockKeepPreviewPlatform{}
 	p.n = "feishu"
 	e := NewEngine("test", &stubAgent{}, []Platform{p}, "", LangEnglish)
-	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolMessages: false})
+	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolDetail: ToolDetailNone})
 	sessionKey := "test:user1"
 	session := e.sessions.GetOrCreateActive(sessionKey)
 	agentSession := newControllableSession("s1")
@@ -1619,10 +1619,10 @@ func TestProcessInteractiveEvents_HiddenToolProgressKeepsPreviewOnFinalize(t *te
 	}
 }
 
-func TestProcessInteractiveEvents_ToolMessagesDisabledSuppressesToolProgressOnly(t *testing.T) {
+func TestProcessInteractiveEvents_ToolDetailNoneSuppressesToolProgressOnly(t *testing.T) {
 	p := &stubPlatformEngine{n: "telegram"}
 	e := NewEngine("test", &stubAgent{}, []Platform{p}, "", LangEnglish)
-	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolMessages: false})
+	e.SetDisplayConfig(DisplayCfg{ThinkingMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500, ToolDetail: ToolDetailNone})
 	sessionKey := "telegram:user1"
 	session := e.sessions.GetOrCreateActive(sessionKey)
 	agentSession := newControllableSession("s1")
@@ -1919,7 +1919,7 @@ func TestProcessInteractiveEvents_CardProgressTruncatesToolInputByToolMaxLen(t *
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       50,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 		Mode:             "full",
 	})
 	sessionKey := "feishu:user-card-truncate"
@@ -1983,7 +1983,7 @@ func TestProcessInteractiveEvents_RichCardShowsThinkingContent(t *testing.T) {
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 		Mode:             "full",
 		CardMode:         "rich",
 	})
@@ -2023,7 +2023,7 @@ func TestProcessInteractiveEvents_RichCardCoalescesToolResult(t *testing.T) {
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 		Mode:             "full",
 		CardMode:         "rich",
 	})
@@ -2149,7 +2149,7 @@ func TestProcessInteractiveEvents_RichCardResolvesMarkdownImages(t *testing.T) {
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 	})
 	sessionKey := "feishu:user-rich-image-resolver"
 	session := e.sessions.GetOrCreateActive(sessionKey)
@@ -2208,7 +2208,7 @@ func runRichCardSilentScenario(t *testing.T, name string, chunks []string, final
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 	})
 	sessionKey := "feishu:user-rich-silent-" + name
 	session := e.sessions.GetOrCreateActive(sessionKey)
@@ -2305,7 +2305,7 @@ func TestProcessInteractiveEvents_RichCard_TextThenNoReply_PreservesBody(t *test
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 	})
 	sessionKey := "feishu:user-rich-text-then-noreply"
 	session := e.sessions.GetOrCreateActive(sessionKey)
@@ -2362,7 +2362,7 @@ func TestProcessInteractiveEvents_RichCard_ToolThenNoReply(t *testing.T) {
 		ThinkingMessages: true,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 	})
 	sessionKey := "feishu:user-rich-tool-then-noreply"
 	session := e.sessions.GetOrCreateActive(sessionKey)
@@ -5861,14 +5861,14 @@ func TestCmdStatus_UsesLegacyTextOnPlatformWithoutCardSupport(t *testing.T) {
 func TestCmdQuiet_TogglesDisplay(t *testing.T) {
 	p := &stubPlatformEngine{n: "test"}
 	e := NewEngine("test", &stubAgent{}, []Platform{p}, "", LangEnglish)
-	e.SetDisplayConfig(DisplayCfg{Mode: "full", ThinkingMessages: true, ToolMessages: true, ThinkingMaxLen: 300, ToolMaxLen: 500})
+	e.SetDisplayConfig(DisplayCfg{Mode: "full", ThinkingMessages: true, ToolDetail: ToolDetailFull, ThinkingMaxLen: 300, ToolMaxLen: 500})
 	msg := &Message{SessionKey: "test:user1", ReplyCtx: "ctx"}
 
 	// 1st /quiet: full → quiet
 	e.cmdQuiet(p, msg, nil)
-	if e.display.Mode != "quiet" || e.display.ThinkingMessages || e.display.ToolMessages {
-		t.Fatalf("after 1st /quiet: Mode=%q, TM=%v, Tool=%v, want quiet/false/false",
-			e.display.Mode, e.display.ThinkingMessages, e.display.ToolMessages)
+	if e.display.Mode != "quiet" || e.display.ThinkingMessages || e.display.ToolDetail != ToolDetailNone {
+		t.Fatalf("after 1st /quiet: Mode=%q, TM=%v, Tool=%v, want quiet/false/none",
+			e.display.Mode, e.display.ThinkingMessages, e.display.ToolDetail)
 	}
 	if len(p.sent) != 1 || !strings.Contains(p.sent[0], "Quiet mode ON") {
 		t.Fatalf("sent = %q, want quiet ON message", p.sent)
@@ -5877,9 +5877,9 @@ func TestCmdQuiet_TogglesDisplay(t *testing.T) {
 	// 2nd /quiet: quiet → compact
 	p.sent = nil
 	e.cmdQuiet(p, msg, nil)
-	if e.display.Mode != "compact" || e.display.ThinkingMessages || e.display.ToolMessages {
-		t.Fatalf("after 2nd /quiet: Mode=%q, TM=%v, Tool=%v, want compact/false/false",
-			e.display.Mode, e.display.ThinkingMessages, e.display.ToolMessages)
+	if e.display.Mode != "compact" || e.display.ThinkingMessages || e.display.ToolDetail != ToolDetailNone {
+		t.Fatalf("after 2nd /quiet: Mode=%q, TM=%v, Tool=%v, want compact/false/none",
+			e.display.Mode, e.display.ThinkingMessages, e.display.ToolDetail)
 	}
 	if len(p.sent) != 1 || !strings.Contains(p.sent[0], "Compact mode") {
 		t.Fatalf("sent = %q, want compact mode message", p.sent)
@@ -5888,9 +5888,11 @@ func TestCmdQuiet_TogglesDisplay(t *testing.T) {
 	// 3rd /quiet: compact → full
 	p.sent = nil
 	e.cmdQuiet(p, msg, nil)
-	if e.display.Mode != "full" || !e.display.ThinkingMessages || !e.display.ToolMessages {
-		t.Fatalf("after 3rd /quiet: Mode=%q, TM=%v, Tool=%v, want full/true/true",
-			e.display.Mode, e.display.ThinkingMessages, e.display.ToolMessages)
+	// Leaving quiet mode restores the default level, not the verbose one — the
+	// previous value is not remembered across the cycle.
+	if e.display.Mode != "full" || !e.display.ThinkingMessages || e.display.ToolDetail != ToolDetailSummary {
+		t.Fatalf("after 3rd /quiet: Mode=%q, TM=%v, Tool=%v, want full/true/summary",
+			e.display.Mode, e.display.ThinkingMessages, e.display.ToolDetail)
 	}
 	if len(p.sent) != 1 || !strings.Contains(p.sent[0], "Quiet mode OFF") {
 		t.Fatalf("sent = %q, want quiet OFF message", p.sent)
@@ -6690,7 +6692,7 @@ func TestProcessInteractiveEvents_AskUserQuestionFromAgent_RendersRichCardPrompt
 		ThinkingMessages: true,
 		ThinkingMaxLen:   defaultThinkingMaxLen,
 		ToolMaxLen:       defaultToolMaxLen,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 	})
 
 	key := "test:chat:user1"
@@ -10708,7 +10710,7 @@ func TestCmdStatus_UsesInteractiveKeyForMultiWorkspace(t *testing.T) {
 		ThinkingMessages: false,
 		ThinkingMaxLen:   300,
 		ToolMaxLen:       500,
-		ToolMessages:     true,
+		ToolDetail:       ToolDetailFull,
 	})
 
 	msg := &Message{SessionKey: "feishu:ch1:user1", Content: "/status", ReplyCtx: "ctx"}
@@ -13300,7 +13302,7 @@ func TestEngine_SetterMethods(t *testing.T) {
 	})
 
 	// Test SetDisplaySaveFunc
-	e.SetDisplaySaveFunc(func(mode *string, thinkingMessages *bool, thinkMax, toolMax *int, toolMessages *bool) error {
+	e.SetDisplaySaveFunc(func(mode *string, thinkingMessages *bool, thinkMax, toolMax *int, toolDetail *string) error {
 		return nil
 	})
 

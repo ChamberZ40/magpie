@@ -45,7 +45,7 @@ attachment_send = "off"
 mode = "quiet"
 card_mode = "rich"
 thinking_messages = true
-tool_messages = false
+tool_detail = "none"
 
 [[projects]]
 name = "release"
@@ -55,7 +55,7 @@ reset_on_idle_mins = 0
 mode = "full"
 card_mode = "legacy"
 thinking_messages = false
-tool_messages = true
+tool_detail = "full"
 thinking_max_len = 111
 tool_max_len = 222
 
@@ -91,8 +91,8 @@ app_secret = "secret"
 	if thinking {
 		t.Fatal("thinking_messages = true, want project override false")
 	}
-	if !tools {
-		t.Fatal("tool_messages = false, want project override true")
+	if tools != config.ToolDetailFull {
+		t.Fatalf("tool_detail = %q, want project override %q", tools, config.ToolDetailFull)
 	}
 	if thinkingMax != 111 || toolMax != 222 {
 		t.Fatalf("max lens = %d/%d, want 111/222", thinkingMax, toolMax)
@@ -112,8 +112,10 @@ func TestReleaseConfig_DefaultsKeepAttachmentsAndFullDisplayEnabled(t *testing.T
 		t.Fatalf("AttachmentSend = %q, want default on", cfg.AttachmentSend)
 	}
 	mode, thinking, tools, _, _, _, _, _ := config.EffectiveDisplay(cfg, &cfg.Projects[0])
-	if mode != config.DisplayModeFull || !thinking || !tools {
-		t.Fatalf("display = mode:%s thinking:%v tools:%v, want full/true/true", mode, thinking, tools)
+	// Tool calls still show by default, but only as name + summary — the raw
+	// output that the old tool_messages = true printed is now opt-in.
+	if mode != config.DisplayModeFull || !thinking || tools != config.ToolDetailSummary {
+		t.Fatalf("display = mode:%s thinking:%v tools:%v, want full/true/summary", mode, thinking, tools)
 	}
 	if got := config.EffectiveCardMode(cfg, &cfg.Projects[0]); got != "legacy" {
 		t.Fatalf("card mode = %q, want default legacy", got)
@@ -139,7 +141,7 @@ disabled_commands = ["restart", "shell"]
 mode = "quiet"
 card_mode = "rich"
 thinking_messages = false
-tool_messages = false
+tool_detail = "none"
 
 [projects.agent]
 type = "claudecode"
@@ -182,8 +184,8 @@ app_secret = "secret"
 		t.Fatalf("disabled_commands = %#v", proj.DisabledCommands)
 	}
 	mode, thinking, tools, _, _, _, _, _ := config.EffectiveDisplay(cfg, proj)
-	if mode != config.DisplayModeQuiet || thinking || tools {
-		t.Fatalf("display = mode:%s thinking:%v tools:%v, want quiet/false/false", mode, thinking, tools)
+	if mode != config.DisplayModeQuiet || thinking || tools != config.ToolDetailNone {
+		t.Fatalf("display = mode:%s thinking:%v tools:%v, want quiet/false/none", mode, thinking, tools)
 	}
 	if got := config.EffectiveCardMode(cfg, proj); got != "rich" {
 		t.Fatalf("card mode = %q, want rich", got)

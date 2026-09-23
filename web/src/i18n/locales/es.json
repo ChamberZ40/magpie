@@ -340,8 +340,6 @@
     "thinkingMessagesHint": "Mostrar u ocultar mensajes de proceso de pensamiento",
     "thinkingMaxLen": "Longitud máx. de pensamiento",
     "thinkingMaxLenHint": "Caracteres máximos para mensajes de pensamiento; 0 = sin truncar",
-    "toolMessages": "Progreso de herramientas",
-    "toolMessagesHint": "Mostrar u ocultar mensajes de progreso de herramientas",
     "toolMaxLen": "Longitud máx. de herramientas",
     "toolMaxLenHint": "Caracteres máximos para mensajes de uso de herramientas; 0 = sin truncar",
     "streamPreview": "Vista previa en tiempo real",

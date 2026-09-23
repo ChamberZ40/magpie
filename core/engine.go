@@ -326,12 +326,36 @@ type DisplayCfg struct {
 	Mode             string // "full" (default), "compact", or "quiet" — thinking/tool visibility
 	CardMode         string // "legacy" (default) or "rich" (Card 2.0 Feishu)
 	ThinkingMessages bool
-	ThinkingMaxLen   int // max runes for thinking preview; 0 = no truncation
-	ToolMaxLen       int // max runes for tool use preview; 0 = no truncation
-	ToolMessages     bool
-	HistoryMaxLen    *int // max runes for /history entries; nil = default, 0 = no truncation
-	HideAgentFooter  bool // strip model/token footer lines emitted as agent text
-	Streaming        StreamingCfg
+	ThinkingMaxLen   int    // max runes for thinking preview; 0 = no truncation
+	ToolMaxLen       int    // max runes for tool use preview; 0 = no truncation
+	ToolDetail       string // "none", "summary" (default) or "full" — how much of each tool call is shown
+	// ToolDetailFromProject records that ToolDetail came from the project's own
+	// [projects.display], which outranks the global section /verbose writes to.
+	ToolDetailFromProject bool
+	HistoryMaxLen         *int // max runes for /history entries; nil = default, 0 = no truncation
+	HideAgentFooter       bool // strip model/token footer lines emitted as agent text
+	Streaming             StreamingCfg
+}
+
+// Tool detail levels, mirrored from the config package's constants of the same
+// name. core is stdlib-only and cannot import config, so the pair is kept
+// honest by a test in cmd/magpie, which can see both.
+const (
+	ToolDetailNone    = "none"
+	ToolDetailSummary = "summary"
+	ToolDetailFull    = "full"
+)
+
+// NormalizeToolDetail maps anything unrecognized — including the zero value a
+// caller gets from an uninitialized DisplayCfg — onto the default level. A
+// blank string must not read as "show nothing".
+func NormalizeToolDetail(level string) string {
+	switch level {
+	case ToolDetailNone, ToolDetailSummary, ToolDetailFull:
+		return level
+	default:
+		return ToolDetailSummary
+	}
 }
 
 // Streaming push defaults, mirrored from the config package's defaults of the
@@ -428,7 +452,7 @@ type Engine struct {
 	commandSaveAddFunc func(name, description, prompt, exec, workDir string) error
 	commandSaveDelFunc func(name string) error
 
-	displaySaveFunc   func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolMessages *bool) error
+	displaySaveFunc   func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolDetail *string) error
 	footerGitSaveFunc func(show bool) error
 	configReloadFunc  func() (*ConfigReloadResult, error)
 
@@ -802,7 +826,7 @@ func NewEngine(name string, ag Agent, platforms []Platform, sessionStorePath str
 		cancel:                cancel,
 		i18n:                  NewI18n(lang),
 		attachmentSendEnabled: true,
-		display:               DisplayCfg{Mode: "full", ThinkingMessages: true, ThinkingMaxLen: defaultThinkingMaxLen, ToolMaxLen: defaultToolMaxLen, ToolMessages: true, CardMode: "legacy"},
+		display:               DisplayCfg{Mode: "full", ThinkingMessages: true, ThinkingMaxLen: defaultThinkingMaxLen, ToolMaxLen: defaultToolMaxLen, ToolDetail: ToolDetailSummary, CardMode: "legacy"},
 		commands:              NewCommandRegistry(),
 		skills:                NewSkillRegistry(),
 		aliases:               make(map[string]string),
@@ -946,6 +970,7 @@ func (e *Engine) SetTTSSaveFunc(fn func(mode string) error) {
 // SetDisplayConfig overrides the default truncation settings.
 func (e *Engine) SetDisplayConfig(cfg DisplayCfg) {
 	cfg.Streaming = normalizeStreamingCfg(cfg.Streaming)
+	cfg.ToolDetail = NormalizeToolDetail(cfg.ToolDetail)
 	e.display = cfg
 }
 
@@ -1174,7 +1199,7 @@ func (e *Engine) SetCommandSaveDelFunc(fn func(name string) error) {
 	e.commandSaveDelFunc = fn
 }
 
-func (e *Engine) SetDisplaySaveFunc(fn func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolMessages *bool) error) {
+func (e *Engine) SetDisplaySaveFunc(fn func(mode *string, thinkingMessages *bool, thinkingMaxLen, toolMaxLen *int, toolDetail *string) error) {
 	e.displaySaveFunc = fn
 }
 
@@ -5071,7 +5096,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 
 		// main codebase has no per-session quiet flag; pr309 referenced
 		// sessionQuiet which we drop. e.display.ThinkingMessages /
-		// ToolMessages handle user-level quiet in the fallback branches.
+		// ToolDetail handle user-level quiet in the fallback branches.
 		richCardSupporter, hasRichCard := p.(RichCardSupporter)
 		// Card 2.0 rich-card path is opt-in via [display] mode = "rich".
 		// Default "legacy" keeps upstream behavior for all platforms.
@@ -5186,7 +5211,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			toolCount++
 			if hasRichCard {
 				// When tool messages are suppressed, skip card updates on tool events.
-				if !e.display.ToolMessages {
+				if e.display.ToolDetail == ToolDetailNone {
 					break
 				}
 				toolSteps = append(toolSteps, ToolStep{
@@ -5215,7 +5240,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			// When tool messages are hidden, behavior depends on display mode:
 			//   quiet:   append separator to keep all text in one card
 			//   compact: freeze+detach to split text into separate cards
-			if !e.display.ToolMessages && len(textParts) > segmentStart {
+			if e.display.ToolDetail == ToolDetailNone && len(textParts) > segmentStart {
 				if e.display.Mode == "quiet" {
 					if sp.canPreview() && sp.appendSeparator("\n\n") {
 						textParts = append(textParts, "\n\n")
@@ -5236,7 +5261,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				}
 				silentHold = false
 			}
-			if e.display.ToolMessages {
+			if e.display.ToolDetail != ToolDetailNone {
 				// --- StreamingCard path ---
 				if streamCard != nil && !streamCard.Failed() {
 					toolInput := event.ToolInput
@@ -5313,7 +5338,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			}
 
 		case EventToolResult:
-			if e.display.ToolMessages {
+			if e.display.ToolDetail != ToolDetailNone {
 				result := strings.TrimSpace(event.ToolResult)
 				if result == "" {
 					result = strings.TrimSpace(event.Content)
@@ -5323,7 +5348,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				}
 				if result != "" || event.ToolStatus != "" || event.ToolExitCode != nil || event.ToolSuccess != nil {
 					if hasRichCard {
-						toolSteps = mergeRichToolResult(toolSteps, event, result, e.display.ToolMaxLen)
+						toolSteps = mergeRichToolResult(toolSteps, event, result, e.display.ToolMaxLen, e.display.ToolDetail)
 						if cardMessageID == nil {
 							card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
 							if starter, ok := p.(PreviewStarter); ok {
@@ -5633,7 +5658,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			// When tool progress is hidden, segmentStart stays 0 and textParts
 			// contains ALL text across tool boundaries. Prefer the full accumulated
 			// text over event.Content which only contains the last assistant segment.
-			if len(textParts) > 0 && segmentStart == 0 && !e.display.ToolMessages {
+			if len(textParts) > 0 && segmentStart == 0 && e.display.ToolDetail == ToolDetailNone {
 				fullResponse = strings.Join(textParts, "")
 			} else if fullResponse == "" && len(textParts) > 0 {
 				fullResponse = strings.Join(textParts, "")
@@ -6226,7 +6251,13 @@ channelClosed:
 	}
 }
 
-func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen int) []ToolStep {
+// mergeRichToolResult folds a tool result into the step the card already shows
+// for that call, appending a step if the tool-use event never arrived.
+//
+// detail decides how much of the result is kept. Below "full" the step is still
+// completed — Done is what keeps the panel row from looking stuck mid-run — but
+// the four fields the renderer turns into extra lines are left empty.
+func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen int, detail string) []ToolStep {
 	toolName := strings.TrimSpace(event.ToolName)
 	if toolName == "" {
 		toolName = "Tool"
@@ -6264,10 +6295,12 @@ func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen in
 	if strings.TrimSpace(steps[idx].Summary) == "" && strings.TrimSpace(event.ToolInput) != "" {
 		steps[idx].Summary = truncateIf(strings.TrimSpace(event.ToolInput), maxLen)
 	}
-	steps[idx].Result = result
-	steps[idx].Status = strings.TrimSpace(event.ToolStatus)
-	steps[idx].ExitCode = event.ToolExitCode
-	steps[idx].Success = event.ToolSuccess
+	if detail == ToolDetailFull {
+		steps[idx].Result = result
+		steps[idx].Status = strings.TrimSpace(event.ToolStatus)
+		steps[idx].ExitCode = event.ToolExitCode
+		steps[idx].Success = event.ToolSuccess
+	}
 	steps[idx].Done = true
 	return steps
 }
@@ -6382,6 +6415,7 @@ var builtinCommands = []struct {
 	{[]string{"mode"}, "mode"},
 	{[]string{"lang"}, "lang"},
 	{[]string{"quiet"}, "quiet"},
+	{[]string{"verbose"}, "verbose"},
 	{[]string{"provider"}, "provider"},
 	{[]string{"memory"}, "memory"},
 	{[]string{"cron"}, "cron"},
@@ -6595,6 +6629,8 @@ func (e *Engine) handleCommand(p Platform, msg *Message, raw string) bool {
 		e.cmdLang(p, msg, args)
 	case "quiet":
 		e.cmdQuiet(p, msg, args)
+	case "verbose":
+		e.cmdVerbose(p, msg, args)
 	case "provider":
 		e.cmdProvider(p, msg, args)
 	case "memory":
@@ -8698,12 +8734,8 @@ func (e *Engine) cmdStatus(p Platform, msg *Message) {
 		if e.display.ThinkingMessages {
 			thinkingStr = e.i18n.T(MsgEnabledShort)
 		}
-		toolStr := e.i18n.T(MsgDisabledShort)
-		if e.display.ToolMessages {
-			toolStr = e.i18n.T(MsgEnabledShort)
-		}
 		modeStr += e.i18n.Tf(MsgStatusThinkingMessages, thinkingStr)
-		modeStr += e.i18n.Tf(MsgStatusToolMessages, toolStr)
+		modeStr += e.i18n.Tf(MsgStatusToolDetail, e.display.ToolDetail)
 
 		s := sessions.GetOrCreateActive(msg.SessionKey)
 		sessionDisplayName := sessions.GetSessionName(s.GetAgentSessionID())
@@ -9123,12 +9155,9 @@ func (e *Engine) renderStatusCard(sessionKey string, userID string) *Card {
 	if e.display.ThinkingMessages {
 		thinkingStr = e.i18n.T(MsgEnabledShort)
 	}
-	toolStr := e.i18n.T(MsgDisabledShort)
-	if e.display.ToolMessages {
-		toolStr = e.i18n.T(MsgEnabledShort)
-	}
+
 	modeStr += e.i18n.Tf(MsgStatusThinkingMessages, thinkingStr)
-	modeStr += e.i18n.Tf(MsgStatusToolMessages, toolStr)
+	modeStr += e.i18n.Tf(MsgStatusToolDetail, e.display.ToolDetail)
 
 	s := sessions.GetOrCreateActive(sessionKey)
 	sessionDisplayName := sessions.GetSessionName(s.GetAgentSessionID())
@@ -9462,6 +9491,7 @@ func helpCardGroups() []helpCardGroup {
 				{command: "/memory", action: "cmd:/memory"},
 				{command: "/allow", action: "cmd:/allow"},
 				{command: "/quiet", action: "cmd:/quiet"},
+				{command: "/verbose", action: "cmd:/verbose"},
 				{command: "/tts", action: "cmd:/tts"},
 			},
 		},
@@ -10224,15 +10254,15 @@ func (e *Engine) cmdQuiet(p Platform, msg *Message, args []string) {
 	switch newMode {
 	case "compact", "quiet":
 		e.display.ThinkingMessages = false
-		e.display.ToolMessages = false
+		e.display.ToolDetail = ToolDetailNone
 	default:
 		e.display.ThinkingMessages = true
-		e.display.ToolMessages = true
+		e.display.ToolDetail = ToolDetailSummary
 	}
 
 	if e.displaySaveFunc != nil {
 		tm := e.display.ThinkingMessages
-		tool := e.display.ToolMessages
+		tool := e.display.ToolDetail
 		if err := e.displaySaveFunc(&newMode, &tm, nil, nil, &tool); err != nil {
 			slog.Error("failed to persist display config after /quiet", "error", err)
 		}
@@ -10246,6 +10276,37 @@ func (e *Engine) cmdQuiet(p Platform, msg *Message, args []string) {
 	default:
 		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgQuietOff))
 	}
+}
+
+// cmdVerbose reads and writes tool_detail. Unlike /quiet it does not cycle:
+// with three levels a blind toggle makes you fire the command repeatedly just
+// to find out where you are, so a bare /verbose only reports.
+func (e *Engine) cmdVerbose(p Platform, msg *Message, args []string) {
+	if len(args) == 0 {
+		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgVerboseCurrent, e.display.ToolDetail))
+		return
+	}
+
+	level := strings.ToLower(strings.TrimSpace(args[0]))
+	switch level {
+	case ToolDetailNone, ToolDetailSummary, ToolDetailFull:
+	default:
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgVerboseUsage))
+		return
+	}
+
+	e.display.ToolDetail = level
+	if e.displaySaveFunc != nil {
+		if err := e.displaySaveFunc(nil, nil, nil, nil, &level); err != nil {
+			slog.Error("failed to persist display config after /verbose", "error", err)
+		}
+	}
+
+	reply := e.i18n.Tf(MsgVerboseSet, level)
+	if e.display.ToolDetailFromProject {
+		reply += e.i18n.T(MsgVerboseProjectOverride)
+	}
+	e.reply(p, msg.ReplyCtx, reply)
 }
 
 func (e *Engine) cmdTTS(p Platform, msg *Message, args []string) {
@@ -15064,17 +15125,17 @@ func (e *Engine) configItems() []configItem {
 				case "full":
 					e.display.Mode = "full"
 					e.display.ThinkingMessages = true
-					e.display.ToolMessages = true
+					e.display.ToolDetail = ToolDetailSummary
 				case "compact", "quiet":
 					e.display.Mode = v
 					e.display.ThinkingMessages = false
-					e.display.ToolMessages = false
+					e.display.ToolDetail = ToolDetailNone
 				default:
 					return fmt.Errorf("must be full, compact, or quiet")
 				}
 				if e.displaySaveFunc != nil {
 					tm := e.display.ThinkingMessages
-					tool := e.display.ToolMessages
+					tool := e.display.ToolDetail
 					return e.displaySaveFunc(&v, &tm, nil, nil, &tool)
 				}
 				return nil
@@ -15122,20 +15183,22 @@ func (e *Engine) configItems() []configItem {
 			},
 		},
 		{
-			key:    "tool_messages",
-			desc:   "Whether tool progress messages are shown (true/false)",
-			descZh: "是否显示工具进度消息 (true/false)",
+			key:    "tool_detail",
+			desc:   "How much of each tool call is shown (none/summary/full)",
+			descZh: "工具调用显示的详细程度 (none/summary/full)",
 			getFunc: func() string {
-				return fmt.Sprintf("%t", e.display.ToolMessages)
+				return e.display.ToolDetail
 			},
 			setFunc: func(v string) error {
-				b, err := strconv.ParseBool(v)
-				if err != nil {
-					return fmt.Errorf("invalid boolean: %s", v)
+				level := strings.ToLower(strings.TrimSpace(v))
+				switch level {
+				case ToolDetailNone, ToolDetailSummary, ToolDetailFull:
+				default:
+					return fmt.Errorf("must be none, summary, or full")
 				}
-				e.display.ToolMessages = b
+				e.display.ToolDetail = level
 				if e.displaySaveFunc != nil {
-					return e.displaySaveFunc(nil, nil, nil, nil, &b)
+					return e.displaySaveFunc(nil, nil, nil, nil, &level)
 				}
 				return nil
 			},

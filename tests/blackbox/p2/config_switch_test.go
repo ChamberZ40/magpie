@@ -23,7 +23,8 @@ package p2
 //     - P2-71: show_context_indicator = false → no [ctx: ~N%] in replies
 //     - P2-77: display.mode = "compact" → no thinking/tool messages
 //     - P2-78: thinking_messages = false → no 💭 thinking messages
-//     - P2-79: tool_messages = false → no 🔧 tool messages
+//     - P2-79: tool_detail = "none" → no 🔧 tool messages;
+//              tool_detail = "summary" → 🔧 messages without status/exit lines
 
 import (
 	"strings"
@@ -191,7 +192,7 @@ func TestP2_78_HideThinkingMessages_ClaudeCode(t *testing.T) {
 			CardMode:         "legacy",
 			ThinkingMessages: false, // ← key config
 			ThinkingMaxLen:   300,
-			ToolMessages:     true,
+			ToolDetail:       core.ToolDetailFull,
 			ToolMaxLen:       500,
 		})
 	})
@@ -212,9 +213,9 @@ func TestP2_78_HideThinkingMessages_ClaudeCode(t *testing.T) {
 	t.Logf("combined reply: %q", truncate(combined, 300))
 }
 
-// ── P2-79: tool_messages = false ─────────────────────────────────────────────
+// ── P2-79: tool_detail = "none" / "summary" ──────────────────────────────────
 
-// TestP2_79_HideToolMessages verifies that when tool_messages=false, no tool
+// TestP2_79_HideToolMessages verifies that at tool_detail = "none", no tool
 // progress messages (🔧 / tool invocation indicators) appear.
 //
 // SLOW — requires a real agent that calls a tool.
@@ -226,7 +227,7 @@ func TestP2_79_HideToolMessages_ClaudeCode(t *testing.T) {
 			CardMode:         "legacy",
 			ThinkingMessages: true,
 			ThinkingMaxLen:   300,
-			ToolMessages:     false, // ← key config
+			ToolDetail:       core.ToolDetailNone, // ← key config
 			ToolMaxLen:       500,
 		})
 	})
@@ -238,7 +239,7 @@ func TestP2_79_HideToolMessages_ClaudeCode(t *testing.T) {
 	for _, msg := range msgs {
 		text := msg.Text()
 		if strings.HasPrefix(text, "🔧") || strings.Contains(text, "\n🔧") {
-			t.Errorf("P2-79: tool message appeared with ToolMessages=false\nmsg: %q", text)
+			t.Errorf("P2-79: tool message appeared at tool_detail=none\nmsg: %q", text)
 		}
 	}
 	// Verify the agent still produced a useful final response (tool was called
@@ -251,6 +252,44 @@ func TestP2_79_HideToolMessages_ClaudeCode(t *testing.T) {
 		t.Errorf("P2-79: agent didn't produce file listing result\ncombined: %q", combined)
 	}
 	t.Logf("P2-79 OK: no 🔧 tool messages; final result has file listing")
+}
+
+// TestP2_79_SummaryToolDetail covers the default level, which the old boolean
+// had no way to express: tool calls are still announced, but without the status
+// line and the raw command output that "full" appends.
+//
+// SLOW — requires a real agent that calls a tool.
+func TestP2_79_SummaryToolDetail_ClaudeCode(t *testing.T) {
+	t.Parallel()
+	env := helper.NewEnvWithSetup(t, "claudecode", func(e *core.Engine) {
+		e.SetDisplayConfig(core.DisplayCfg{
+			Mode:             "full",
+			CardMode:         "legacy",
+			ThinkingMessages: true,
+			ThinkingMaxLen:   300,
+			ToolDetail:       core.ToolDetailSummary, // ← key config
+			ToolMaxLen:       500,
+		})
+	})
+
+	msgs := env.SendComplete("List the files in the current directory. Use a shell command.")
+
+	sawTool := false
+	for _, msg := range msgs {
+		text := msg.Text()
+		if !strings.HasPrefix(text, "🔧") && !strings.Contains(text, "\n🔧") {
+			continue
+		}
+		sawTool = true
+		// "status: ok | exit: 0" is the giveaway that full detail leaked through.
+		if strings.Contains(text, "exit:") || strings.Contains(text, "status:") {
+			t.Errorf("P2-79: full-detail status line appeared at tool_detail=summary\nmsg: %q", text)
+		}
+	}
+	if !sawTool {
+		t.Error("P2-79: no 🔧 tool message at tool_detail=summary — the default must still announce tool calls")
+	}
+	t.Logf("P2-79 OK: tool messages present, no status/exit lines")
 }
 
 // ── P2-77: display.mode = "compact" ──────────────────────────────────────────
@@ -268,7 +307,7 @@ func TestP2_77_DisplayModeCompact_ClaudeCode(t *testing.T) {
 			CardMode:         "legacy",
 			ThinkingMessages: true,
 			ThinkingMaxLen:   300,
-			ToolMessages:     true,
+			ToolDetail:       core.ToolDetailFull,
 			ToolMaxLen:       500,
 		})
 	})

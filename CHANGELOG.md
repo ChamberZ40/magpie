@@ -15,6 +15,19 @@
 
 - **Config reload dropped the streaming pacing.** `reloadConfig` rebuilt `DisplayCfg` without the streaming thresholds, and an omitted field is not a compile error — it silently resolved back to the built-in defaults. Editing `[display.streaming]` and reloading therefore restored the old pacing with no warning. Both assembly sites now wire it, and a test fails on any future `DisplayCfg` literal that forgets.
 
+### Changed
+
+- **BREAKING — `[display].tool_messages` is replaced by `[display].tool_detail`**, and the default display of tool calls changes. The old boolean could only choose between "nothing" and "tool name, one-line summary, `status: ok | exit: 0`, and the entire raw output", which made the Feishu rich card unreadable on any turn with real command output. `tool_detail` adds the missing middle rung and defaults to it:
+  - `none` — tool calls are not shown at all (equivalent to the old `tool_messages = false`)
+  - `summary` — tool name plus a one-line summary (**new default**)
+  - `full` — plus status, exit code and raw output (equivalent to the old `tool_messages = true`)
+
+  There is no compatibility shim: a leftover `tool_messages` key is ignored, and configs that relied on `tool_messages = true` must now say `tool_detail = "full"` to keep the verbose rows. `tool_detail` is unrelated to `mode = "full"` — mode decides whether tool events are shown at all, `tool_detail` decides how much of each one. The Management API field and the Web UI's "Tool progress" toggle are removed along with the old key.
+
+### Added
+
+- **`/verbose [none|summary|full]`**: read or set `tool_detail` from chat. A bare `/verbose` only reports the current level — it does not cycle — and setting a level persists to the global `[display]` section, warning when the project's own `[projects.display].tool_detail` would outrank it on reload.
+
 ## Unreleased
 
 ### Added
