@@ -6,6 +6,14 @@
 - **`agent_session_idle_timeout_mins`**: new per-project config option that closes an idle live agent process after a clean turn while preserving the cc-connect session and saved agent session ID. The next message starts a new agent process and resumes the same conversation. Set to `0` or leave unset to disable (#1338).
 - **Reasonix agent**: new agent adapter for Reasonix multi-model coding agent, bridging via HTTP serve API (POST /submit, SSE /events, POST /approve). Supports default/yolo/plan permission modes, SSE auto-reconnect with backoff, and thinking accumulator. (#1281)
 - **cloud_web platform**: 新增 self-hosted IM Gateway 作为 first-class platform 接入 (CWIP v1 协议,支持 websocket / long_poll / gateway 3 种 transport,完整 inbound/outbound + capability negotiation + graceful degradation)。 详见 docs/cloud-web.md + #1282。
+- **`[display.streaming]`**: the pacing of partial replies is now configurable instead of being four literals buried in the engine. `throttle_ms` / `throttle_chars` gate pushes on platforms that can stream a single card element; `fallback_throttle_ms` / `fallback_throttle_chars` gate the slower path where each push has to redraw the whole card. A frame goes out when *either* threshold is crossed, so lowering one alone is enough. Resolution follows the rest of `[display]` — per-project over global over default, decided field by field — and each value has a floor, since zero would mean "push every token" and walk into the platform's rate limiter. Defaults match the previous hard-coded behaviour exactly.
+- **Feishu `card_print_frequency_ms` / `card_print_step`**: expose Card 2.0's client-side typewriter pacing. These are a *client render ceiling*, not a source of frames: asking the client to reveal every 50ms while the server pushes every 200ms changes nothing visible, so magpie now warns at startup when the two contradict each other.
+- **`stream_partial_text`** (Claude Code): on by default, passing `--include-partial-messages` so assistant text arrives as token deltas rather than one event per finished block. This is what makes `[stream_preview]` and the Feishu card typewriter actually stream. Set to `false` for whole-block replies.
+- **`[stream_preview].disabled_platforms`**: turn the live preview off for named platforms while leaving it on everywhere else.
+
+### Fixed
+
+- **Config reload dropped the streaming pacing.** `reloadConfig` rebuilt `DisplayCfg` without the streaming thresholds, and an omitted field is not a compile error — it silently resolved back to the built-in defaults. Editing `[display.streaming]` and reloading therefore restored the old pacing with no warning. Both assembly sites now wire it, and a test fails on any future `DisplayCfg` literal that forgets.
 
 ## Unreleased
 

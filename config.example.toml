@@ -147,6 +147,30 @@ level = "info" # debug, info, warn, error
 #                                # （耗时、工具次数、改动文件）以小字渲染在分割线下方，而不是留在正文里。
 #                                # 只识别最后一行，且必须以「─」或「—」开头（默认 false 不处理）
 
+# Streaming pacing: how often a partially-written reply is pushed to the
+# platform. A frame goes out when EITHER threshold is crossed, so lowering one
+# alone is enough to speed things up — and both have a floor, because zero would
+# mean "push every token" and walk straight into the platform's rate limiter.
+# 流式节流：多久把写了一半的回复推给平台一次。两个阈值满足任一即推送，所以单独调低
+# 其中一个就会加快；两者都有下限，写 0 等于「每个 token 推一帧」，会直接撞上平台限流。
+#
+# [display.streaming]
+# throttle_ms = 200             # Interval when the platform can stream one card element (min 20)
+# throttle_chars = 20           # ...or this many new characters, whichever comes first (min 1)
+# fallback_throttle_ms = 1500   # Interval when every push has to rewrite the whole card
+# fallback_throttle_chars = 30  # 全量重绘卡片代价高得多，所以回退档刻意更慢
+#
+# Feishu note: the card's own card_print_frequency_ms (see [[projects.platforms]]
+# options) is a CLIENT render ceiling, not a source of frames. Asking the client
+# to print every 50ms while the server pushes every 200ms changes nothing you can
+# see. Keep throttle_ms <= card_print_frequency_ms; magpie warns at startup when
+# they contradict each other. A working pair is throttle_ms = 60 with
+# card_print_frequency_ms = 50.
+# 飞书提示：card_print_frequency_ms 是客户端的渲染上限，不产生帧。服务端 200ms 才推一帧
+# 时，让客户端每 50ms 打印一次不会有任何观感变化。请保持 throttle_ms <=
+# card_print_frequency_ms，两者矛盾时 magpie 会在启动日志里告警。可用组合：
+# throttle_ms = 60 配 card_print_frequency_ms = 50。
+
 # Per-project override: each [[projects]] entry may have its own [projects.display]
 # block that overrides individual fields of the global [display] block above.
 # Resolution order is per-field — set fields win, unset fields fall back to global,
@@ -263,6 +287,8 @@ level = "info" # debug, info, warn, error
 # interval_ms = 1500        # Min ms between updates (default: 1500) / 更新最小间隔毫秒数（默认 1500）
 # min_delta_chars = 30      # Min new chars before sending update (default: 30) / 发送更新前最少新增字符数（默认 30）
 # max_chars = 2000          # Max preview length (default: 2000) / 预览最大长度（默认 2000）
+# disabled_platforms = ["feishu"]  # Platforms to exclude while leaving preview on elsewhere
+#                                  # 单独关闭某些平台的流式预览，其他平台不受影响
 
 # =============================================================================
 # Instant Reply / 即时确认回复
@@ -903,6 +929,16 @@ mode = "default" # "default" | "acceptEdits" (edit) | "plan" | "auto" | "bypassP
 # 也可以禁用特定工具（传递给 --disallowedTools）：
 # disallowed_tools = ["WebSearch", "WebFetch"]
 
+# Token-level streaming (Claude Code only) / 逐字流式输出（仅 Claude Code）
+# On by default. Passes --include-partial-messages, so assistant text arrives as
+# token deltas instead of one event per finished block — this is what makes
+# [stream_preview] and the Feishu card typewriter actually stream. Set to false
+# to go back to whole-block replies (less chatty stdout, no live preview).
+# 默认开启。传入 --include-partial-messages，使正文按 token 增量到达，而不是每个
+# 内容块完成后才发一次事件——[stream_preview] 与飞书卡片打字机效果依赖于此。
+# 设为 false 则退回整块回复（stdout 更安静，但没有实时预览）。
+# stream_partial_text = true
+
 # Optional: specify a custom system prompt / 可选：指定自定义系统提示
 # Replaces Claude's default system prompt (passed via --system-prompt).
 # 替换 Claude 默认系统提示（通过 --system-prompt 传入）。
@@ -1096,6 +1132,11 @@ app_secret = "your-feishu-app-secret"
 #                           # 默认 true：用「回复消息」API（引用用户消息）。设为 false 则在会话里发普通消息、不引用触发消息。
 # progress_style = "legacy" # Progress rendering style: legacy | compact | card
 #                           # 进度消息展示风格：legacy（逐条消息）| compact（单消息持续更新）| card（结构化卡片）
+# card_print_frequency_ms = 50  # Card 2.0 streaming: ms between client reveals (default: 50, must be > 0)
+# card_print_step = 1           # ...and characters revealed per tick (default: 1, must be > 0)
+#                           # 卡片流式打字节奏：每隔多少毫秒吐出多少个字。这是客户端的渲染上限，
+#                           # 服务端推送更慢时它不起作用——请配合 [display.streaming] 的
+#                           # throttle_ms 一起调，见那一节的说明。
 # resolve_mentions = false  # Auto-resolve @name in outgoing messages to Feishu at tags by matching group member names
 #                           # 自动将发出消息中的 @显示名 替换为飞书 at 标签（通过匹配群成员名称）
 # mention_map = { BOT-A = "ou_bot_a_open_id", BOT-B = "ou_bot_b_open_id" }

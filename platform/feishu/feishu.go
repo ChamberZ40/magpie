@@ -193,7 +193,20 @@ type Platform struct {
 	imageBatchMu     sync.Mutex
 	imageBatch       map[string]*imageBatchEntry
 	imageBatchWindow time.Duration // quiet period before flushing a batch; 0 means use defaultImageBatchWindow
+
+	// Client-side reveal pacing for streaming Card 2.0 renders, from the
+	// card_print_frequency_ms / card_print_step platform options.
+	cardPrintFreqMs int
+	cardPrintStep   int
 }
+
+// Defaults for the streaming card's client-side reveal pacing. 50ms per step of
+// one character reads as steady typing; it is also below the engine's default
+// push interval, so the client always has text buffered to reveal.
+const (
+	defaultCardPrintFreqMs = 50
+	defaultCardPrintStep   = 1
+)
 
 // defaultImageBatchWindow is the quiet period after the last image in a
 // session before the buffered batch is dispatched as a single multi-image
@@ -378,6 +391,31 @@ func newPlatform(name, domain string, opts map[string]any) (core.Platform, error
 		imageBatchWindow = time.Duration(ms) * time.Millisecond
 	}
 
+	// Client-side reveal pacing. Both are rejected at zero or below: the card
+	// would either never advance or print nothing per tick.
+	cardPrintFreqMs := defaultCardPrintFreqMs
+	if raw, ok := opts["card_print_frequency_ms"]; ok {
+		ms, err := coerceMilliseconds(raw)
+		if err != nil {
+			return nil, fmt.Errorf("%s: invalid card_print_frequency_ms %v: %w", name, raw, err)
+		}
+		if ms <= 0 {
+			return nil, fmt.Errorf("%s: card_print_frequency_ms must be > 0, got %d", name, ms)
+		}
+		cardPrintFreqMs = int(ms)
+	}
+	cardPrintStep := defaultCardPrintStep
+	if raw, ok := opts["card_print_step"]; ok {
+		step, err := coerceMilliseconds(raw)
+		if err != nil {
+			return nil, fmt.Errorf("%s: invalid card_print_step %v: %w", name, raw, err)
+		}
+		if step <= 0 {
+			return nil, fmt.Errorf("%s: card_print_step must be > 0, got %d", name, step)
+		}
+		cardPrintStep = int(step)
+	}
+
 	// Webhook mode configuration (for Lark international version)
 	port, _ := opts["port"].(string)
 	if port == "" {
@@ -422,6 +460,8 @@ func newPlatform(name, domain string, opts map[string]any) (core.Platform, error
 		mentionMap:                 mentionMap,
 		imageBatch:                 make(map[string]*imageBatchEntry),
 		imageBatchWindow:           imageBatchWindow,
+		cardPrintFreqMs:            cardPrintFreqMs,
+		cardPrintStep:              cardPrintStep,
 	}
 	if !useInteractiveCard {
 		base.self = base
@@ -6484,10 +6524,20 @@ func buildCollapsiblePanel(title string, expanded bool, elements []map[string]an
 
 const maxRichCardJSONBytes = 28000
 
+// cardStreaming describes how one render should stream. enabled drives Feishu's
+// streaming_mode; the pacing pair drives streaming_config, which governs how
+// fast the client reveals text it already holds. The two are independent: the
+// server decides when a frame arrives, the client decides how it is drawn.
+type cardStreaming struct {
+	enabled     bool
+	printFreqMs int
+	printStep   int
+}
+
 // buildRichCard renders a Card 2.0 "single-card" turn with collapsible
 // reasoning/tool panels, streaming markdown body, status-colored header, and a
 // pre-composed multi-line statusFooter (engine-owned, includes elapsed).
-func buildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
+func buildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming cardStreaming, statusFooter string) string {
 	b, err := buildRichCardJSONBytes(status, lang, steps, markdown, streaming, statusFooter)
 	if err != nil {
 		slog.Debug("feishu: build rich card marshal failed, fallback to basic card", "error", err)
@@ -6530,20 +6580,20 @@ func buildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, m
 	return buildCardJSONWithStatus(fallbackMarkdown, status, lang)
 }
 
-func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) ([]byte, error) {
+func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming cardStreaming, statusFooter string) ([]byte, error) {
 	reasoningSteps, toolSteps := splitRichStepsByLane(steps)
 	panelMaps := make([]map[string]any, 0, 2)
 	if len(reasoningSteps) > 0 {
 		panelMaps = append(panelMaps, buildCollapsiblePanel(
 			richPanelLabel(core.MsgRichPanelReasoning, len(reasoningSteps), lang),
-			streaming,
+			streaming.enabled,
 			richPanelElements(reasoningSteps, lang),
 		))
 	}
 	if len(toolSteps) > 0 {
 		panelMaps = append(panelMaps, buildCollapsiblePanel(
 			richPanelLabel(core.MsgRichPanelTools, len(toolSteps), lang),
-			streaming,
+			streaming.enabled,
 			richPanelElements(toolSteps, lang),
 		))
 	}
@@ -6596,13 +6646,18 @@ func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.To
 	// Header glyph, localized word and template color all follow status.
 	headerTitle, headerTemplate := richStatusHeader(status, lang)
 
+	cardConfig := map[string]any{
+		"streaming_mode":             streaming.enabled,
+		"update_multi":               true,
+		"enable_forward_interaction": true,
+	}
+	if pacing := streaming.pacing(); pacing != nil {
+		cardConfig["streaming_config"] = pacing
+	}
+
 	card := map[string]any{
 		"schema": "2.0",
-		"config": map[string]any{
-			"streaming_mode":             streaming,
-			"update_multi":               true,
-			"enable_forward_interaction": true,
-		},
+		"config": cardConfig,
 		"header": map[string]any{
 			"template": headerTemplate,
 			"title":    map[string]any{"tag": "plain_text", "content": headerTitle},
@@ -6611,6 +6666,27 @@ func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.To
 	}
 
 	return json.Marshal(card)
+}
+
+// pacing renders the streaming_config payload, or nil when there is nothing to
+// say. Feishu takes each field as an object of per-client overrides under a
+// "default" key. An unset value is omitted rather than sent as zero: zero would
+// ask the client to reveal everything at once, the very look this fixes.
+func (s cardStreaming) pacing() map[string]any {
+	if !s.enabled {
+		return nil
+	}
+	pacing := map[string]any{}
+	if s.printFreqMs > 0 {
+		pacing["print_frequency_ms"] = map[string]any{"default": s.printFreqMs}
+	}
+	if s.printStep > 0 {
+		pacing["print_step"] = map[string]any{"default": s.printStep}
+	}
+	if len(pacing) == 0 {
+		return nil
+	}
+	return pacing
 }
 
 func compactRichStepsForCardSize(steps []core.ToolStep, perLaneLimit, textLimit int) []core.ToolStep {
@@ -6707,7 +6783,11 @@ func splitMarkdownByTables(md string, maxTables int) []string {
 // word and the collapsible panel titles, and may be empty (falls back to English).
 func (p *Platform) BuildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, markdown string, streaming bool, statusFooter string) string {
 	p.richCardLang.Store(lang)
-	return buildRichCard(status, lang, steps, markdown, streaming, statusFooter)
+	return buildRichCard(status, lang, steps, markdown, cardStreaming{
+		enabled:     streaming,
+		printFreqMs: p.cardPrintFreqMs,
+		printStep:   p.cardPrintStep,
+	}, statusFooter)
 }
 
 // currentRichCardLang returns the language tag from the most recent

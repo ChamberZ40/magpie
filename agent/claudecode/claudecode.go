@@ -53,6 +53,12 @@ type Agent struct {
 	systemPrompt     string   // Custom system prompt to pass to Claude CLI
 	pluginDirs       []string // Plugin directories to load via --plugin-dir (repeatable)
 
+	// streamPartialText adds --include-partial-messages so assistant text
+	// arrives as token deltas instead of one event per finished content
+	// block, which is what makes the IM-side preview stream. Defaults to
+	// true; set stream_partial_text = false in the agent options to opt out.
+	streamPartialText bool
+
 	appendSystemPrompt string // Custom text appended to the system prompt (keeps Claude's default)
 
 	providerProxy  *core.ProviderProxy // local proxy for third-party providers
@@ -200,6 +206,13 @@ func New(opts map[string]any) (core.Agent, error) {
 	routerURL, _ := opts["router_url"].(string)
 	routerAPIKey, _ := opts["router_api_key"].(string)
 
+	// Token-level streaming is on unless explicitly disabled, matching the
+	// default of [stream_preview] which it feeds.
+	streamPartialText := true
+	if v, ok := opts["stream_partial_text"].(bool); ok {
+		streamPartialText = v
+	}
+
 	// run_as_user: optional OS-user isolation. Injected into opts from
 	// the project-level config field by cmd/magpie/main.go.
 	spawnOpts := core.SpawnOptions{}
@@ -249,25 +262,25 @@ func New(opts map[string]any) (core.Agent, error) {
 	}
 
 	return &Agent{
-		workDir:          workDir,
-		cmd:              cmd,
-		cliExtraArgs:     cliExtraArgs,
-		cmdArgsFlag:      cmdArgsFlag,
-		model:            model,
-		reasoningEffort:  normalizeEffort(reasoningEffort),
-		mode:             mode,
-		systemPrompt:     systemPrompt,
-		pluginDirs:       pluginDirs,
-		allowedTools:     allowedTools,
-		disallowedTools:  disallowedTools,
-		maxContextTokens: maxContextTokens,
-		configEnv:        configEnv,
-		activeIdx:        -1,
-		routerURL:        routerURL,
-		routerAPIKey:     routerAPIKey,
-		spawnOpts:        spawnOpts,
-		ccDataDir:        ccDataDir,
-
+		workDir:            workDir,
+		cmd:                cmd,
+		cliExtraArgs:       cliExtraArgs,
+		cmdArgsFlag:        cmdArgsFlag,
+		model:              model,
+		reasoningEffort:    normalizeEffort(reasoningEffort),
+		mode:               mode,
+		systemPrompt:       systemPrompt,
+		pluginDirs:         pluginDirs,
+		allowedTools:       allowedTools,
+		disallowedTools:    disallowedTools,
+		maxContextTokens:   maxContextTokens,
+		configEnv:          configEnv,
+		activeIdx:          -1,
+		routerURL:          routerURL,
+		routerAPIKey:       routerAPIKey,
+		spawnOpts:          spawnOpts,
+		ccDataDir:          ccDataDir,
+		streamPartialText:  streamPartialText,
 		appendSystemPrompt: appendSystemPrompt,
 	}, nil
 }
@@ -530,7 +543,7 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	disableVerbose := a.routerURL != ""
 	a.mu.Unlock()
 
-	return newClaudeSession(ctx, workDir, a.cmd, a.cliExtraArgs, a.cmdArgsFlag, model, effort, sessionID, mode, systemPrompt, appendSystemPrompt, tools, disTools, pluginDirs, extraEnv, platformPrompt, disableVerbose, a.spawnOpts, maxTok, a.ccDataDir)
+	return newClaudeSession(ctx, workDir, a.cmd, a.cliExtraArgs, a.cmdArgsFlag, model, effort, sessionID, mode, systemPrompt, appendSystemPrompt, tools, disTools, pluginDirs, extraEnv, platformPrompt, disableVerbose, a.streamPartialText, a.spawnOpts, maxTok, a.ccDataDir)
 }
 
 func (a *Agent) ListSessions(ctx context.Context) ([]core.AgentSessionInfo, error) {

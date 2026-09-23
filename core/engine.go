@@ -331,6 +331,59 @@ type DisplayCfg struct {
 	ToolMessages     bool
 	HistoryMaxLen    *int // max runes for /history entries; nil = default, 0 = no truncation
 	HideAgentFooter  bool // strip model/token footer lines emitted as agent text
+	Streaming        StreamingCfg
+}
+
+// Streaming push defaults, mirrored from the config package's defaults of the
+// same name. core is stdlib-only and cannot import config, so the pair is
+// kept honest by a test in cmd/magpie, which can see both.
+const (
+	DefaultStreamThrottle         = 200 * time.Millisecond
+	DefaultStreamThrottleChars    = 20
+	DefaultStreamFallbackThrottle = 1500 * time.Millisecond
+	DefaultStreamFallbackChars    = 30
+)
+
+// StreamingCfg controls how often partially-complete reply text is pushed to
+// the platform while the agent is still generating.
+//
+// The two pairs are picked by platform capability, not by preference: a
+// platform that can stream a single card element gets the tighter pair, since
+// each push moves only the changed text. One that cannot has to resend the
+// whole card per push, so it gets the slower fallback pair.
+type StreamingCfg struct {
+	Throttle         time.Duration
+	ThrottleChars    int
+	FallbackThrottle time.Duration
+	FallbackChars    int
+}
+
+// streamThrottle returns the interval and character delta that gate the next
+// push. The caller pushes when EITHER is exceeded.
+func (e *Engine) streamThrottle(hasElementStreaming bool) (time.Duration, int) {
+	if hasElementStreaming {
+		return e.display.Streaming.Throttle, e.display.Streaming.ThrottleChars
+	}
+	return e.display.Streaming.FallbackThrottle, e.display.Streaming.FallbackChars
+}
+
+// normalizeStreamingCfg replaces unset thresholds with the defaults. A zero
+// here would read as "push with no delay", so it cannot be left to mean
+// itself.
+func normalizeStreamingCfg(cfg StreamingCfg) StreamingCfg {
+	if cfg.Throttle <= 0 {
+		cfg.Throttle = DefaultStreamThrottle
+	}
+	if cfg.ThrottleChars <= 0 {
+		cfg.ThrottleChars = DefaultStreamThrottleChars
+	}
+	if cfg.FallbackThrottle <= 0 {
+		cfg.FallbackThrottle = DefaultStreamFallbackThrottle
+	}
+	if cfg.FallbackChars <= 0 {
+		cfg.FallbackChars = DefaultStreamFallbackChars
+	}
+	return cfg
 }
 
 // InstantReplyCfg controls the immediate confirmation reply sent when a message
@@ -892,6 +945,7 @@ func (e *Engine) SetTTSSaveFunc(fn func(mode string) error) {
 
 // SetDisplayConfig overrides the default truncation settings.
 func (e *Engine) SetDisplayConfig(cfg DisplayCfg) {
+	cfg.Streaming = normalizeStreamingCfg(cfg.Streaming)
 	e.display = cfg
 }
 
@@ -5374,15 +5428,11 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 									}
 								}
 							}
-							// Throttle: cardkit-v1 streaming text path uses tighter limits (200ms / 20 chars)
-							// for smoother typewriter UX; full-card Patch fallback keeps the original 1500ms / 30 chars.
+							// Throttle: a platform that can stream a single card element
+							// gets the tighter pair; the full-card Patch fallback gets the
+							// slower one. Both are configurable via [display.streaming].
 							streamer, hasStreamer := p.(RichCardTextStreamer)
-							throttleDur := 1500 * time.Millisecond
-							throttleChars := 30
-							if hasStreamer && cardMessageID != nil {
-								throttleDur = 200 * time.Millisecond
-								throttleChars = 20
-							}
+							throttleDur, throttleChars := e.streamThrottle(hasStreamer && cardMessageID != nil)
 							if cardMessageID != nil && (time.Since(lastRichCardUpdate) > throttleDur || len(partialText)-lastRichCardLen > throttleChars) {
 								// Prefer per-element streaming text update (cardkit-v1) when available;
 								// it engages Lark's native typewriter rendering. Falls back to

@@ -543,6 +543,7 @@ func main() {
 		{
 			mode, tm, tool, tmlen, toollen, _, _, hideAgentFooter := config.EffectiveDisplay(cfg, &proj)
 			historyMaxLen := config.EffectiveHistoryMaxLen(cfg, &proj)
+			streaming := config.EffectiveStreaming(cfg, &proj)
 			engine.SetDisplayConfig(core.DisplayCfg{
 				Mode:             mode,
 				CardMode:         config.EffectiveCardMode(cfg, &proj),
@@ -552,7 +553,14 @@ func main() {
 				ToolMessages:     tool,
 				HistoryMaxLen:    &historyMaxLen,
 				HideAgentFooter:  hideAgentFooter,
+				Streaming: core.StreamingCfg{
+					Throttle:         time.Duration(streaming.ThrottleMS) * time.Millisecond,
+					ThrottleChars:    streaming.ThrottleChars,
+					FallbackThrottle: time.Duration(streaming.FallbackThrottleMS) * time.Millisecond,
+					FallbackChars:    streaming.FallbackThrottleChars,
+				},
 			})
+			warnIfClientPrintsFasterThanWePush(&proj, streaming)
 		}
 
 		// Wire shell configuration
@@ -1629,6 +1637,7 @@ func reloadConfig(configPath, projName string, engine *core.Engine) (*core.Confi
 	// Reload display config (includes legacy quiet → display mapping)
 	mode, tm, tool, tmlen, toollen, showCtx, showFooter, hideAgentFooter := config.EffectiveDisplay(cfg, proj)
 	historyMaxLen := config.EffectiveHistoryMaxLen(cfg, proj)
+	streaming := config.EffectiveStreaming(cfg, proj)
 	engine.SetDisplayConfig(core.DisplayCfg{
 		Mode:             mode,
 		CardMode:         config.EffectiveCardMode(cfg, proj),
@@ -1638,6 +1647,12 @@ func reloadConfig(configPath, projName string, engine *core.Engine) (*core.Confi
 		ToolMessages:     tool,
 		HistoryMaxLen:    &historyMaxLen,
 		HideAgentFooter:  hideAgentFooter,
+		Streaming: core.StreamingCfg{
+			Throttle:         time.Duration(streaming.ThrottleMS) * time.Millisecond,
+			ThrottleChars:    streaming.ThrottleChars,
+			FallbackThrottle: time.Duration(streaming.FallbackThrottleMS) * time.Millisecond,
+			FallbackChars:    streaming.FallbackThrottleChars,
+		},
 	})
 	result.DisplayUpdated = true
 

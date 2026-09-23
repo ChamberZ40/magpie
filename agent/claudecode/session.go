@@ -54,6 +54,19 @@ type claudeSession struct {
 	usageMu   sync.Mutex
 	lastUsage *core.ContextUsage
 
+	// streamedMu guards streamedText, which accumulates — per content-block
+	// index of the message currently being generated — the text already
+	// emitted as EventText from `stream_event` token deltas.
+	//
+	// It exists because --include-partial-messages does not replace the
+	// `assistant` event: Claude Code emits the token deltas AND then the
+	// completed message carrying the same text. Without this bookkeeping
+	// handleAssistant would re-emit every block and the reply body would
+	// appear twice. Reset on each message_start, so it only ever describes
+	// the in-flight message (a tool-using turn produces several).
+	streamedMu   sync.Mutex
+	streamedText map[int]string
+
 	// gracefulStopTimeout is how long Close() waits for a clean exit
 	// (stdin close → Stop hooks → process exit) before escalating to
 	// SIGTERM and then SIGKILL. Default: 120s to match claude-mem's
@@ -217,7 +230,7 @@ func buildAppendSystemPrompt(agentPrompt, platformPrompt, userAppend string) str
 	return strings.Join(parts, "\n")
 }
 
-func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs []string, cmdArgsFlag string, model, effort, sessionID, mode, systemPrompt, appendSystemPrompt string, allowedTools, disallowedTools []string, pluginDirs []string, extraEnv []string, platformPrompt string, disableVerbose bool, spawnOpts core.SpawnOptions, maxContextTokens int, ccDataDir string) (*claudeSession, error) {
+func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs []string, cmdArgsFlag string, model, effort, sessionID, mode, systemPrompt, appendSystemPrompt string, allowedTools, disallowedTools []string, pluginDirs []string, extraEnv []string, platformPrompt string, disableVerbose bool, streamPartialText bool, spawnOpts core.SpawnOptions, maxContextTokens int, ccDataDir string) (*claudeSession, error) {
 	sessionCtx, cancel := context.WithCancel(ctx)
 
 	// Claude Code rejects bypassPermissions when running as root.
@@ -240,6 +253,13 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 	}
 	if !disableVerbose {
 		innerArgs = append(innerArgs, "--verbose")
+	}
+	// Token-level streaming. Without this the CLI only emits an `assistant`
+	// event once a whole content block is finished, so the IM-side preview
+	// (core/streaming.go, and the rich-card typewriter path in the engine)
+	// has nothing to update between blocks and the reply lands in one piece.
+	if streamPartialText {
+		innerArgs = append(innerArgs, "--include-partial-messages")
 	}
 
 	if mode != "" && mode != "default" {
@@ -455,6 +475,7 @@ func newClaudeSession(ctx context.Context, workDir, cliBin string, cliExtraArgs 
 		ccHooks:             newCCPermissionHookRunner(workDir),
 		startupWarning:      rootDowngradeWarning,
 		promptFilePath:      cleanupPromptPath,
+		streamedText:        make(map[int]string),
 	}
 	cs.setPermissionMode(mode)
 	cs.sessionID.Store(sessionID)
@@ -580,6 +601,8 @@ func (cs *claudeSession) handleReadLoopLine(line string) {
 		cs.handleUser(raw)
 	case "result":
 		cs.handleResult(raw)
+	case "stream_event":
+		cs.handleStreamEvent(raw)
 	case "control_request":
 		cs.handleControlRequest(raw)
 	case "control_cancel_request":
@@ -646,6 +669,74 @@ func parseClaudeUsage(usage map[string]any) (input, output, cacheCreation, cache
 	return
 }
 
+// handleStreamEvent consumes the `stream_event` envelope that
+// --include-partial-messages adds to the stream. Only text deltas are
+// forwarded — they are what drives the IM-side typewriter preview. Thinking
+// and tool_use blocks keep arriving via the completed `assistant` event,
+// which is early enough for how the engine renders them.
+func (cs *claudeSession) handleStreamEvent(raw map[string]any) {
+	ev, ok := raw["event"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	switch evType, _ := ev["type"].(string); evType {
+	case "message_start":
+		// One turn can produce several messages (one per model turn between
+		// tool calls) and block indexes restart at 0 in each, so the previous
+		// message's bookkeeping must not leak into this one.
+		cs.resetStreamedText()
+
+	case "content_block_delta":
+		delta, ok := ev["delta"].(map[string]any)
+		if !ok {
+			return
+		}
+		if deltaType, _ := delta["type"].(string); deltaType != "text_delta" {
+			return
+		}
+		text, _ := delta["text"].(string)
+		if text == "" {
+			return
+		}
+		blockIdx := 0
+		if v, ok := ev["index"].(float64); ok {
+			blockIdx = int(v)
+		}
+
+		cs.streamedMu.Lock()
+		if cs.streamedText == nil {
+			cs.streamedText = make(map[int]string)
+		}
+		cs.streamedText[blockIdx] += text
+		cs.streamedMu.Unlock()
+
+		select {
+		case cs.events <- core.Event{Type: core.EventText, Content: text}:
+		case <-cs.ctx.Done():
+		}
+	}
+}
+
+// resetStreamedText drops all per-block delta bookkeeping, leaving the map
+// non-nil so handleStreamEvent can keep writing to it without a nil check.
+func (cs *claudeSession) resetStreamedText() {
+	cs.streamedMu.Lock()
+	cs.streamedText = make(map[int]string)
+	cs.streamedMu.Unlock()
+}
+
+// takeStreamedText returns the text already delivered as deltas for one
+// content-block index and clears the entry, so that a second `assistant`
+// event naming the same block cannot suppress it twice.
+func (cs *claudeSession) takeStreamedText(blockIdx int) string {
+	cs.streamedMu.Lock()
+	defer cs.streamedMu.Unlock()
+	streamed := cs.streamedText[blockIdx]
+	delete(cs.streamedText, blockIdx)
+	return streamed
+}
+
 func (cs *claudeSession) handleAssistant(raw map[string]any) {
 	msg, ok := raw["message"].(map[string]any)
 	if !ok {
@@ -695,7 +786,7 @@ func (cs *claudeSession) handleAssistant(raw map[string]any) {
 	if !ok {
 		return
 	}
-	for _, contentItem := range contentArr {
+	for blockIdx, contentItem := range contentArr {
 		item, ok := contentItem.(map[string]any)
 		if !ok {
 			continue
@@ -724,13 +815,32 @@ func (cs *claudeSession) handleAssistant(raw map[string]any) {
 				}
 			}
 		case "text":
-			if text, ok := item["text"].(string); ok && text != "" {
-				evt := core.Event{Type: core.EventText, Content: text}
-				select {
-				case cs.events <- evt:
-				case <-cs.ctx.Done():
-					return
+			text, _ := item["text"].(string)
+			if text == "" {
+				continue
+			}
+			// Drop whatever the stream_event delta path already delivered for
+			// this block; the engine concatenates EventText contents, so
+			// re-emitting the completed block here would double the reply.
+			if streamed := cs.takeStreamedText(blockIdx); streamed != "" {
+				switch {
+				case streamed == text:
+					continue
+				case strings.HasPrefix(text, streamed):
+					text = strings.TrimPrefix(text, streamed)
+				default:
+					// Deltas disagree with the finished block. Emitting the
+					// full text duplicates at worst; staying silent would
+					// lose the reply outright, so prefer the former.
+					slog.Debug("claudeSession: streamed text is not a prefix of the finished block, emitting it whole",
+						"index", blockIdx, "streamed_len", len(streamed), "text_len", len(text))
 				}
+			}
+			evt := core.Event{Type: core.EventText, Content: text}
+			select {
+			case cs.events <- evt:
+			case <-cs.ctx.Done():
+				return
 			}
 		}
 	}

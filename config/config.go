@@ -217,6 +217,46 @@ type DisplayConfig struct {
 	ShowContextIndicator *bool   `toml:"show_context_indicator"` // whether [ctx: ~N%] suffix is shown; default true
 	ReplyFooter          *bool   `toml:"reply_footer"`           // whether Codex-like footer is shown; default true
 	HideAgentFooter      *bool   `toml:"hide_agent_footer"`      // strip agent-emitted model/token footer lines; default false
+
+	Streaming *StreamingDisplayConfig `toml:"streaming,omitempty"` // how often partial reply text is pushed
+}
+
+// Streaming push defaults. These were bare literals in the engine until they
+// became configurable; keep them here so the pre-config behaviour stays the
+// out-of-the-box behaviour.
+const (
+	DefaultStreamThrottleMS            = 200  // rich-card element streaming (Feishu cardkit typewriter)
+	DefaultStreamThrottleChars         = 20   // ... or this many new characters, whichever comes first
+	DefaultStreamFallbackThrottleMS    = 1500 // full-card Patch fallback, used when the platform has no element streaming
+	DefaultStreamFallbackThrottleChars = 30
+
+	// MinStreamThrottleMS is the floor for a push interval. Below this the
+	// bridge spends its platform rate-limit budget on redraws of a reply that
+	// is not finished yet.
+	MinStreamThrottleMS = 20
+)
+
+// StreamingDisplayConfig tunes how often a partially-complete reply is pushed
+// to the chat platform while the agent is still generating.
+//
+// The engine pushes when EITHER the interval has elapsed OR the character
+// delta is exceeded, so the two thresholds are not independent: a small
+// *Chars value overrides a large *MS one. On Feishu these also have to be read
+// together with the platform's card_print_frequency_ms — pushing slower than
+// the client prints leaves the client setting with nothing to do.
+type StreamingDisplayConfig struct {
+	ThrottleMS            *int `toml:"throttle_ms"`
+	ThrottleChars         *int `toml:"throttle_chars"`
+	FallbackThrottleMS    *int `toml:"fallback_throttle_ms"`
+	FallbackThrottleChars *int `toml:"fallback_throttle_chars"`
+}
+
+// StreamingDisplay is StreamingDisplayConfig with every option resolved.
+type StreamingDisplay struct {
+	ThrottleMS            int
+	ThrottleChars         int
+	FallbackThrottleMS    int
+	FallbackThrottleChars int
 }
 
 // StreamPreviewConfig controls real-time streaming preview in IM.
@@ -1012,6 +1052,39 @@ func EffectiveCardMode(cfg *Config, proj *ProjectConfig) string {
 	return "legacy"
 }
 
+// EffectiveStreaming resolves the streaming push thresholds. Resolution
+// matches the rest of [display]: project [display.streaming] > global
+// [display.streaming] > default, decided per field, so a project block that
+// sets one value keeps inheriting the others.
+func EffectiveStreaming(cfg *Config, proj *ProjectConfig) StreamingDisplay {
+	var projStream, globalStream *StreamingDisplayConfig
+	if proj != nil && proj.Display != nil {
+		projStream = proj.Display.Streaming
+	}
+	if cfg != nil {
+		globalStream = cfg.Display.Streaming
+	}
+
+	pick := func(get func(*StreamingDisplayConfig) *int, dflt int) int {
+		for _, src := range []*StreamingDisplayConfig{projStream, globalStream} {
+			if src == nil {
+				continue
+			}
+			if v := get(src); v != nil {
+				return *v
+			}
+		}
+		return dflt
+	}
+
+	return StreamingDisplay{
+		ThrottleMS:            pick(func(s *StreamingDisplayConfig) *int { return s.ThrottleMS }, DefaultStreamThrottleMS),
+		ThrottleChars:         pick(func(s *StreamingDisplayConfig) *int { return s.ThrottleChars }, DefaultStreamThrottleChars),
+		FallbackThrottleMS:    pick(func(s *StreamingDisplayConfig) *int { return s.FallbackThrottleMS }, DefaultStreamFallbackThrottleMS),
+		FallbackThrottleChars: pick(func(s *StreamingDisplayConfig) *int { return s.FallbackThrottleChars }, DefaultStreamFallbackThrottleChars),
+	}
+}
+
 // validatePermissive is like validate but skips the "at least one platform"
 // requirement so that commands like `magpie web` can operate on agent-only
 // configs before platforms have been set up.
@@ -1115,6 +1188,24 @@ func validateDisplayConfig(prefix string, display *DisplayConfig) error {
 	}
 	if display.HistoryMaxLen != nil && *display.HistoryMaxLen < 0 {
 		return fmt.Errorf("config: %s.history_max_len must be >= 0", prefix)
+	}
+	if s := display.Streaming; s != nil {
+		// The engine pushes when EITHER threshold is crossed, so a zero
+		// character delta lets every token through and the interval never
+		// applies. Both floors exist to keep a config from silently becoming
+		// "push on every token".
+		if s.ThrottleMS != nil && *s.ThrottleMS < MinStreamThrottleMS {
+			return fmt.Errorf("config: %s.streaming.throttle_ms must be >= %d", prefix, MinStreamThrottleMS)
+		}
+		if s.FallbackThrottleMS != nil && *s.FallbackThrottleMS < MinStreamThrottleMS {
+			return fmt.Errorf("config: %s.streaming.fallback_throttle_ms must be >= %d", prefix, MinStreamThrottleMS)
+		}
+		if s.ThrottleChars != nil && *s.ThrottleChars < 1 {
+			return fmt.Errorf("config: %s.streaming.throttle_chars must be >= 1", prefix)
+		}
+		if s.FallbackThrottleChars != nil && *s.FallbackThrottleChars < 1 {
+			return fmt.Errorf("config: %s.streaming.fallback_throttle_chars must be >= 1", prefix)
+		}
 	}
 	return nil
 }

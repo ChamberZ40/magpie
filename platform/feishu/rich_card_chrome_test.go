@@ -19,8 +19,8 @@ func TestBuildRichCard_HeaderIsStableAcrossBuilds(t *testing.T) {
 		{Kind: core.ToolStepKindTool, Name: "Bash", Summary: `{"command":"ls"}`},
 	}
 
-	first := buildRichCard(core.CardStatusWorking, "", steps, "partial", true, "")
-	second := buildRichCard(core.CardStatusWorking, "", steps, "partial", true, "")
+	first := buildRichCard(core.CardStatusWorking, "", steps, "partial", cardStreaming{enabled: true}, "")
+	second := buildRichCard(core.CardStatusWorking, "", steps, "partial", cardStreaming{enabled: true}, "")
 	if first != second {
 		t.Fatalf("rich card is not deterministic across builds:\nfirst:  %s\nsecond: %s", first, second)
 	}
@@ -55,7 +55,7 @@ func TestBuildRichCard_HeaderLocalization(t *testing.T) {
 		// Unknown tag falls back to English rather than rendering a raw key.
 		{"de", core.CardStatusError, "✖ Error", "red"},
 	} {
-		cardJSON := buildRichCard(tc.status, tc.lang, nil, "body", false, "")
+		cardJSON := buildRichCard(tc.status, tc.lang, nil, "body", cardStreaming{}, "")
 		if got := cardHeaderTitle(t, cardJSON); got != tc.title {
 			t.Errorf("lang=%q status=%s title = %q, want %q", tc.lang, tc.status, got, tc.title)
 		}
@@ -80,7 +80,7 @@ func TestBuildRichCard_PanelTitleLocalization(t *testing.T) {
 		{"ja", "🧠 推論 (1)", "🔧 ツール (1)"},
 		{"es", "🧠 Razonamiento (1)", "🔧 Herramientas (1)"},
 	} {
-		panels := collectCardPanels(t, buildRichCard(core.CardStatusDone, tc.lang, steps, "body", false, ""))
+		panels := collectCardPanels(t, buildRichCard(core.CardStatusDone, tc.lang, steps, "body", cardStreaming{}, ""))
 		if len(panels) != 2 {
 			t.Fatalf("lang=%q panel count = %d, want 2: %#v", tc.lang, len(panels), panels)
 		}
@@ -106,7 +106,7 @@ func TestBuildRichCard_PanelTitleLocalization(t *testing.T) {
 // had no coverage at all before (every existing test passed statusFooter="").
 func TestBuildRichCard_FooterIsOneNotationBlock(t *testing.T) {
 	footer := "⏱ 2.4s\nclaude-opus-5 · ctx 4%\n~/code/magpie"
-	elements := cardBodyElements(t, buildRichCard(core.CardStatusDone, "en", nil, "answer", false, footer))
+	elements := cardBodyElements(t, buildRichCard(core.CardStatusDone, "en", nil, "answer", cardStreaming{}, footer))
 
 	if len(elements) < 2 {
 		t.Fatalf("want at least body + hr + footer elements, got %#v", elements)
@@ -140,7 +140,7 @@ func TestBuildRichCard_FooterIsOneNotationBlock(t *testing.T) {
 	}
 
 	// Empty footer renders neither the separator nor a footer block.
-	for _, elem := range cardBodyElements(t, buildRichCard(core.CardStatusDone, "en", nil, "answer", false, "")) {
+	for _, elem := range cardBodyElements(t, buildRichCard(core.CardStatusDone, "en", nil, "answer", cardStreaming{}, "")) {
 		if elem["tag"] == "hr" {
 			t.Errorf("empty footer should not emit an hr: %#v", elem)
 		}
@@ -219,7 +219,7 @@ func TestStatusCardHeaderMatchesRichCard(t *testing.T) {
 	for _, status := range []core.CardStatus{
 		core.CardStatusWorking, core.CardStatusThinking, core.CardStatusDone, core.CardStatusError,
 	} {
-		rich := cardHeaderTitle(t, buildRichCard(status, "zh", nil, "body", false, ""))
+		rich := cardHeaderTitle(t, buildRichCard(status, "zh", nil, "body", cardStreaming{}, ""))
 		simple := cardHeaderTitle(t, buildCardJSONWithStatus("body", status, "zh"))
 		if rich != simple {
 			t.Errorf("status=%q header differs: rich=%q status-card=%q", status, rich, simple)

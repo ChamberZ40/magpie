@@ -13,18 +13,18 @@ import (
 // language. The status header already reports that the turn is running.
 
 func TestBuildRichCard_NoPanelWhenThereAreNoSteps(t *testing.T) {
-	for _, streaming := range []bool{true, false} {
+	for _, streaming := range []cardStreaming{{enabled: true}, {}} {
 		cardJSON := buildRichCard(core.CardStatusThinking, "zh", nil, "答案是 42", streaming, "")
 		if panels := collectCardPanels(t, cardJSON); len(panels) != 0 {
 			t.Errorf("streaming=%v: panel count = %d, want 0 — an empty panel says nothing: %#v",
-				streaming, len(panels), panels)
+				streaming.enabled, len(panels), panels)
 		}
 		if strings.Contains(cardJSON, "Thinking...") {
-			t.Errorf("streaming=%v: card still carries the hardcoded placeholder: %s", streaming, cardJSON)
+			t.Errorf("streaming=%v: card still carries the hardcoded placeholder: %s", streaming.enabled, cardJSON)
 		}
 		// The body must survive the panel removal.
 		if !strings.Contains(cardJSON, "42") {
-			t.Errorf("streaming=%v: card lost its body: %s", streaming, cardJSON)
+			t.Errorf("streaming=%v: card lost its body: %s", streaming.enabled, cardJSON)
 		}
 	}
 }
@@ -48,7 +48,7 @@ func TestBuildRichCard_HiddenStepSummaryIsLocalized(t *testing.T) {
 		{"es", "5 pasos anteriores ocultos"},
 	}
 	for _, tt := range tests {
-		cardJSON := buildRichCard(core.CardStatusWorking, tt.lang, steps, "", true, "")
+		cardJSON := buildRichCard(core.CardStatusWorking, tt.lang, steps, "", cardStreaming{enabled: true}, "")
 		if !strings.Contains(cardJSON, tt.want) {
 			t.Errorf("lang=%q: card should contain %q: %s", tt.lang, tt.want, cardJSON)
 		}
