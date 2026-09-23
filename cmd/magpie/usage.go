@@ -170,7 +170,7 @@ Commands:
                      (does not start the bridge — run 'magpie' for that)
 
   doctor             Diagnose the local setup
-    runas            Check the run_as_user isolation prerequisites
+    user-isolation   Check the run_as_user isolation prerequisites
 
   send               Send a message to an active session via internal API
                      (-m <text> | --stdin, -p <project>, -s <session>)
@@ -233,7 +233,7 @@ Examples:
   magpie --config /path/to.toml   Start with a specific config file
   magpie daemon install           Install as a system service
   magpie daemon logs -f           Follow daemon logs
-  magpie doctor runas             Check run_as_user prerequisites
+  magpie doctor user-isolation    Check run_as_user prerequisites
   magpie send -m "hello"          Send a message to the active session
   magpie cron list                List all scheduled tasks
   magpie feishu setup             Setup Feishu/Lark bot credentials

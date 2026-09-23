@@ -20,6 +20,12 @@ import (
 	"github.com/ChamberZ40/magpie/core"
 )
 
+// doctorSubcommands lists what `magpie doctor` accepts, in the order the
+// usage text shows them. It exists so the --help text can be checked against
+// the dispatcher: the two drifted once, advertising a `runas` subcommand that
+// never existed.
+var doctorSubcommands = []string{"user-isolation"}
+
 // runDoctor dispatches `magpie doctor ...`. Today the only subcommand
 // is `user-isolation`, but this function is the growth point for future
 // diagnostics.
