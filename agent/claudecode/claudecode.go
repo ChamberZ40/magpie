@@ -1,7 +1,6 @@
 package claudecode
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -646,15 +645,12 @@ func scanSessionMeta(path string) (string, int) {
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 256*1024), 256*1024)
-
 	var firstUserMessage string
 	var aiTitle string
 	var customTitle string
 	var count int
 
-	for scanner.Scan() {
+	if err := core.ScanJSONL(f, core.DefaultJSONLLineLimit, func(line []byte) {
 		var entry struct {
 			Type        string `json:"type"`
 			AITitle     string `json:"aiTitle"`
@@ -663,8 +659,8 @@ func scanSessionMeta(path string) (string, int) {
 				Content json.RawMessage `json:"content"`
 			} `json:"message"`
 		}
-		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
-			continue
+		if err := json.Unmarshal(line, &entry); err != nil {
+			return
 		}
 		switch entry.Type {
 		case "ai-title":
@@ -683,6 +679,8 @@ func scanSessionMeta(path string) (string, int) {
 				}
 			}
 		}
+	}); err != nil {
+		slog.Warn("claudecode: failed to read session transcript", "path", path, "error", err)
 	}
 
 	summary := customTitle
@@ -729,10 +727,7 @@ func (a *Agent) GetSessionHistory(_ context.Context, sessionID string, limit int
 	defer f.Close()
 
 	var entries []core.HistoryEntry
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 256*1024), 256*1024)
-
-	for scanner.Scan() {
+	if err := core.ScanJSONL(f, core.DefaultJSONLLineLimit, func(line []byte) {
 		var raw struct {
 			Type      string `json:"type"`
 			Timestamp string `json:"timestamp"`
@@ -741,17 +736,17 @@ func (a *Agent) GetSessionHistory(_ context.Context, sessionID string, limit int
 				Content json.RawMessage `json:"content"`
 			} `json:"message"`
 		}
-		if json.Unmarshal(scanner.Bytes(), &raw) != nil {
-			continue
+		if json.Unmarshal(line, &raw) != nil {
+			return
 		}
 		if raw.Type != "user" && raw.Type != "assistant" {
-			continue
+			return
 		}
 
 		ts, _ := time.Parse(time.RFC3339Nano, raw.Timestamp)
 		text := extractTextContent(raw.Message.Content)
 		if text == "" {
-			continue
+			return
 		}
 
 		entries = append(entries, core.HistoryEntry{
@@ -759,6 +754,8 @@ func (a *Agent) GetSessionHistory(_ context.Context, sessionID string, limit int
 			Content:   text,
 			Timestamp: ts,
 		})
+	}); err != nil {
+		return nil, fmt.Errorf("claudecode: read session file: %w", err)
 	}
 
 	if limit > 0 && len(entries) > limit {

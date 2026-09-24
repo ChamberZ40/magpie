@@ -1,7 +1,6 @@
 package codex
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -94,19 +93,19 @@ func loadCodexSessionTitles(codexHome string) map[string]string {
 	}()
 
 	titles := make(map[string]string)
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 64*1024), 256*1024)
-	for scanner.Scan() {
+	if err := core.ScanJSONL(f, core.DefaultJSONLLineLimit, func(line []byte) {
 		var entry struct {
 			ID         string `json:"id"`
 			ThreadName string `json:"thread_name"`
 		}
-		if json.Unmarshal(scanner.Bytes(), &entry) != nil {
-			continue
+		if json.Unmarshal(line, &entry) != nil {
+			return
 		}
 		if entry.ID != "" && strings.TrimSpace(entry.ThreadName) != "" {
 			titles[entry.ID] = entry.ThreadName
 		}
+	}); err != nil {
+		slog.Warn("codex: failed to read session index", "path", path, "error", err)
 	}
 	return titles
 }
@@ -132,27 +131,19 @@ func parseCodexSessionFile(path, filterCwd string) *core.AgentSessionInfo {
 	var msgCount int
 	userMsgSeen := 0
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 256*1024), 256*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
+	scanErr := core.ScanJSONL(f, core.DefaultJSONLLineLimit, func(line []byte) {
 		var entry struct {
 			Type    string          `json:"type"`
 			Payload json.RawMessage `json:"payload"`
 		}
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			continue
+		if err := json.Unmarshal(line, &entry); err != nil {
+			return
 		}
 
 		switch entry.Type {
 		case "session_meta":
 			if sessionID != "" {
-				continue
+				return
 			}
 			var meta struct {
 				ID     string          `json:"id"`
@@ -190,6 +181,10 @@ func parseCodexSessionFile(path, filterCwd string) *core.AgentSessionInfo {
 				}
 			}
 		}
+	})
+	if scanErr != nil {
+		slog.Warn("codex: failed to read session transcript", "path", path, "error", scanErr)
+		return nil
 	}
 
 	// Filter by cwd
@@ -259,25 +254,17 @@ func getSessionHistory(sessionID, codexHome string, limit int) ([]core.HistoryEn
 
 	var entries []core.HistoryEntry
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 256*1024), 256*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
+	if err := core.ScanJSONL(f, core.DefaultJSONLLineLimit, func(line []byte) {
 		var raw struct {
 			Timestamp string          `json:"timestamp"`
 			Type      string          `json:"type"`
 			Payload   json.RawMessage `json:"payload"`
 		}
-		if json.Unmarshal([]byte(line), &raw) != nil {
-			continue
+		if json.Unmarshal(line, &raw) != nil {
+			return
 		}
 		if raw.Type != "response_item" {
-			continue
+			return
 		}
 
 		var item struct {
@@ -290,7 +277,7 @@ func getSessionHistory(sessionID, codexHome string, limit int) ([]core.HistoryEn
 			} `json:"content"`
 		}
 		if json.Unmarshal(raw.Payload, &item) != nil {
-			continue
+			return
 		}
 
 		ts, _ := time.Parse(time.RFC3339Nano, raw.Timestamp)
@@ -315,6 +302,8 @@ func getSessionHistory(sessionID, codexHome string, limit int) ([]core.HistoryEn
 		case item.Type == "reasoning" && item.Text != "":
 			// skip reasoning items
 		}
+	}); err != nil {
+		return nil, fmt.Errorf("read transcript %s: %w", path, err)
 	}
 
 	if limit > 0 && len(entries) > limit {
