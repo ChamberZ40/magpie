@@ -5694,8 +5694,6 @@ var (
 	firstURLRe        = regexp.MustCompile(`https?://[^\s'"` + "`" + `<>]+`)
 	firstCodeSpanRe   = regexp.MustCompile("`([^`]+)`")
 	firstQuotedTextRe = regexp.MustCompile(`"([^"]+)"|'([^']+)'`)
-	secretAssignRe    = regexp.MustCompile(`(?i)\b([A-Za-z_][A-Za-z0-9_]*(?:token|secret|password|api[_-]?key|authorization|cookie|credential|bearer|session[_-]?id|client[_-]?secret|access[_-]?key)[A-Za-z0-9_]*)=("[^"]*"|'[^']*'|[^\s"'` + "`" + `]+)`)
-	authHeaderRe      = regexp.MustCompile(`(?i)(Authorization\s*:\s*(?:Bearer|Basic|Token)\s+)([^\s'"` + "`" + `]+)`)
 	sensitiveNameRe   = regexp.MustCompile(`(?i)(token|secret|password|api[_-]?key|authorization|cookie|credential|bearer|session[_-]?id|client[_-]?secret|access[_-]?key)`)
 )
 
@@ -5737,9 +5735,9 @@ func sanitizeToolDetail(kind toolSanitizer, value string) string {
 	case toolSanitizerCommand:
 		return sanitizeCommandLike(cleaned)
 	case toolSanitizerPath:
-		return redactInlineSecrets(strings.TrimSpace(cleaned))
+		return core.RedactInlineSecrets(strings.TrimSpace(cleaned))
 	default:
-		return redactInlineSecrets(cleaned)
+		return core.RedactInlineSecrets(cleaned)
 	}
 }
 
@@ -5749,7 +5747,7 @@ func sanitizeGenericToolText(value string) string {
 		return ""
 	}
 	value = strings.ReplaceAll(value, "\r\n", "\n")
-	return redactInlineSecrets(value)
+	return core.RedactInlineSecrets(value)
 }
 
 func stripToolDisplayQuotes(value string) string {
@@ -5778,19 +5776,13 @@ func sanitizeURLText(value string) string {
 		u.RawQuery = q.Encode()
 		return u.String()
 	}
-	return redactInlineSecrets(value)
+	return core.RedactInlineSecrets(value)
 }
 
 func sanitizeCommandLike(value string) string {
 	value = strings.TrimSpace(stripToolDisplayQuotes(value))
 	value = regexp.MustCompile(`(?i)^(?:command|script|description)\s+`).ReplaceAllString(value, "")
-	return redactInlineSecrets(value)
-}
-
-func redactInlineSecrets(value string) string {
-	value = secretAssignRe.ReplaceAllString(value, "$1=[redacted]")
-	value = authHeaderRe.ReplaceAllString(value, "$1[redacted]")
-	return value
+	return core.RedactInlineSecrets(value)
 }
 
 func isSkillPathValue(value string) bool {

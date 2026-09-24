@@ -5345,7 +5345,14 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					result = strings.TrimSpace(event.Content)
 				}
 				if result != "" {
-					result = truncateIf(result, e.display.ToolMaxLen)
+					// Redact here, at the one point every display path passes
+					// through: the rich card, the progress card and the
+					// plain-text fallback all read this value, and so do all
+					// three platforms. A tool's own output is as likely to
+					// carry a credential as its arguments — `env`, a printed
+					// dotenv, a verbose curl echoing its Authorization header
+					// — and the arguments have been redacted all along.
+					result = sanitizeToolResultForDisplay(result, e.display.ToolMaxLen)
 				}
 				if result != "" || event.ToolStatus != "" || event.ToolExitCode != nil || event.ToolSuccess != nil {
 					if hasRichCard {
