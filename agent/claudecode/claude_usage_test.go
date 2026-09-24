@@ -3,6 +3,7 @@ package claudecode
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -268,4 +269,35 @@ func mustLoadLocation(t *testing.T, name string) *time.Location {
 		t.Fatalf("LoadLocation(%q): %v", name, err)
 	}
 	return loc
+}
+
+// A claude that exits at once — as it does when the configured model is
+// rejected — used to hang the probe forever: the loop consumed the reader's
+// only completion signal, and the deferred cleanup then waited for a second
+// one that never came. The probe runs inside the reply footer, so the hang
+// held the turn's session lock and every later message queued behind it.
+func TestRunClaudeUsageProbe_ReturnsWhenClaudeExitsAtOnce(t *testing.T) {
+	bin := t.TempDir()
+	script := "#!/bin/sh\necho 'model not supported'\nexit 1\n"
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := (&Agent{}).runClaudeUsageProbe(ctx)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("probe reported success for a claude that never rendered /usage")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("runClaudeUsageProbe hung after claude exited")
+	}
 }

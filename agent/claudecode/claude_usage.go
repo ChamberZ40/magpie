@@ -84,7 +84,9 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 	}
 	cmd.Env = env
 
-	var stderr bytes.Buffer
+	// exec copies stderr on its own goroutine while the loop below reads it,
+	// so the buffer needs its own lock.
+	var stderr lockedBuffer
 	cmd.Stderr = &stderr
 
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 120})
@@ -101,7 +103,12 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 
 	terminal := newClaudeUsageTerminal()
 	readDone := make(chan error, 1)
+	// readerExited is what cleanup waits on. It cannot wait on readDone: the
+	// loop below may already have taken readDone's only value, and a second
+	// receive would then block forever.
+	readerExited := make(chan struct{})
 	go func() {
+		defer close(readerExited)
 		buf := make([]byte, 4096)
 		for {
 			n, err := ptmx.Read(buf)
@@ -125,7 +132,7 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 		}
 		cancel()
 		// Wait for reader goroutine to finish so it is never leaked.
-		<-readDone
+		<-readerExited
 		select {
 		case <-processDone:
 		case <-time.After(2 * time.Second):
@@ -197,6 +204,25 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 			}
 		}
 	}
+}
+
+// lockedBuffer is a bytes.Buffer safe for one writer and one reader running
+// concurrently.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 func (a *Agent) usageProbeEnv() []string {
