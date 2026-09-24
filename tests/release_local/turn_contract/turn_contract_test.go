@@ -867,10 +867,15 @@ func TestRichCardModeKeepsToolStepsAndFinalMetadataInOneCard(t *testing.T) {
 		t.Fatalf("rich lifecycle = texts:%#v starts:%#v updates:%#v deletes:%#v, want one editable rich card", texts, starts, updates, deletes)
 	}
 	final := updates[len(updates)-1]
-	for _, want := range []string{"status=done", "step=Bash", "rich output", "markdown=rich final", "[ctx: ~14%] · glm-5.1"} {
+	for _, want := range []string{"status=done", "step=Bash", "rich output", "markdown=rich final", "glm-5.1 · [ctx: ~14%]", "/tmp/release-agent"} {
 		if !strings.Contains(final, want) {
 			t.Fatalf("final rich card = %q, want contains %q", final, want)
 		}
+	}
+	// The footer is two lines: the turn, then the place it ran. An agent that
+	// reports no context window of its own still gets the engine's estimate.
+	if !strings.Contains(final, "glm-5.1 · [ctx: ~14%]\n/tmp/release-agent") {
+		t.Fatalf("final rich card = %q, want the workdir on its own footer line below the turn", final)
 	}
 }
 

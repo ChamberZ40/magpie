@@ -5732,12 +5732,18 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			// it via appendReplyFooter as a fallback. The default
 			// (non-CCD) reply footer keeps its existing inline behavior since
 			// it's a single short line that does not benefit from a separate
-			// card element. In rich mode, the inline-append fallback is
-			// suppressed — the rich card renders an equivalent statusFooter
-			// through BuildRichCard, so re-appending the legacy footer here
-			// would double-print model/ctx/workdir into the card body.
+			// card element.
+			//
+			// This is the plain-text path only. Rich cards build their own
+			// footer from composeRichStatusFooter, which lays the same
+			// information out over two lines; feeding this one-liner in there
+			// as well is what used to collapse that layout.
 			var statusFooter string
-			var legacyStatusFooter string
+			// footerContextHint outlives this block: the rich card's footer uses
+			// it as its context segment when the session reports no window of
+			// its own, since the estimate below is derived from this turn's
+			// token counts and cannot be read back off the session.
+			var footerContextHint string
 			if !isSilent {
 				footerContext := replyFooterContextText(replyFooterSessionContextUsage(state.agentSession), e.i18n)
 				if e.showContextIndicator {
@@ -5749,11 +5755,11 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 						footerContext = fmt.Sprintf("[ctx: ~%d%%]", selfPct)
 					}
 				}
+				footerContextHint = footerContext
 				if status := e.buildClaudeStatusLineFooter(replyAgent, state.agentSession, workspaceDir); status != "" {
 					statusFooter = status
 				} else if footer := e.buildReplyFooter(replyAgent, state.agentSession, workspaceDir, footerContext); footer != "" {
 					statusFooter = footer
-					legacyStatusFooter = footer
 				}
 			}
 			fullResponse = cleanResponse
@@ -5865,10 +5871,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				if splitter, ok := p.(MarkdownTableSplitter); ok {
 					parts = splitter.SplitMarkdownByTables(fullResponse, 5)
 				}
-				richStatusFooter := e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir)
-				if legacyStatusFooter != "" {
-					richStatusFooter = formatElapsed(time.Since(turnStart), false, e.i18n.currentLang()) + "\n" + legacyStatusFooter
-				}
+				richStatusFooter := e.composeRichTurnFooter(turnStart, e.agent, state.agentSession, state.workspaceDir, footerContextHint)
 				finalBody := resolveRichCardMarkdown(parts[0], true)
 				finalCard := richCardSupporter.BuildRichCard(CardStatusDone, string(e.i18n.CurrentLang()), toolSteps, finalBody, false, richStatusFooter)
 				if cardMessageID != nil {
@@ -7315,8 +7318,8 @@ func (e *Engine) buildReplyFooter(agent Agent, session AgentSession, workspaceDi
 // composeRichStatusFooter assembles the multi-line statusFooter passed to
 // RichCardSupporter.BuildRichCard. Layout (skipping any empty line):
 //
-//	line 1: ⏱ <elapsed> · <model> · <effort> · ctx N%     (model onward: e.showContextIndicator)
-//	line 2: 📁 <workdir> · ⎇ <branch>                      (e.showWorkdirIndicator / e.showGitIndicator)
+//	line 1: ⏱ <elapsed> · <model> · <effort> · <ctx bar> N%   (model onward: e.showContextIndicator)
+//	line 2: <workdir> · ⎇ <branch>                            (e.showWorkdirIndicator / e.showGitIndicator)
 //
 // The split is by what the two lines answer. Line 1 is about the turn that just
 // ran — how long, on what model, how much budget is left. Line 2 is about where
@@ -7329,10 +7332,23 @@ func (e *Engine) buildReplyFooter(agent Agent, session AgentSession, workspaceDi
 // token counts aren't yet settled and a live-updating elapsed line creates
 // visual noise during streaming. Header status badge already signals "Working").
 func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, agent Agent, session AgentSession, workspaceDir string) string {
-	if !e.replyFooterEnabled {
+	if streaming {
 		return ""
 	}
-	if streaming {
+	return e.composeRichTurnFooter(turnStart, agent, session, workspaceDir, "")
+}
+
+// composeRichTurnFooter is composeRichStatusFooter for a settled turn, with
+// ctxHint as the context segment to fall back on when the session itself
+// reports no usable window.
+//
+// The hint exists because the engine can estimate a percentage from the turn's
+// own token counts for agents that never report a context window. That estimate
+// is turn-local, so it cannot be read back off the session here — the caller
+// that has it passes it in. Without it the rich card would be the one surface
+// showing no context reading at all for those agents.
+func (e *Engine) composeRichTurnFooter(turnStart time.Time, agent Agent, session AgentSession, workspaceDir, ctxHint string) string {
+	if !e.replyFooterEnabled {
 		return ""
 	}
 	lang := e.i18n.CurrentLang()
@@ -7345,7 +7361,7 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 	// invited misreading as the total. The ctx% below carries the one thing that
 	// number was meant to convey. The legacy footer still reports the full
 	// breakdown via buildClaudeStatusLineFooter for anyone who wants it.
-	head := []string{formatElapsed(time.Since(turnStart), streaming, lang)}
+	head := []string{formatElapsed(time.Since(turnStart), false, lang)}
 
 	if e.showContextIndicator {
 		usage := replyFooterSessionContextUsage(session)
@@ -7359,6 +7375,8 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 		}
 		if ctx := richFooterContext(usage, lang); ctx != "" {
 			head = append(head, ctx)
+		} else if hint := strings.TrimSpace(ctxHint); hint != "" {
+			head = append(head, hint)
 		}
 	}
 
