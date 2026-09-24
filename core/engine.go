@@ -7174,41 +7174,17 @@ func (e *Engine) cmdSwitch(p Platform, msg *Message, args []string) {
 		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgWsResolutionError, err))
 		return
 	}
-	agentSessions, err := agent.ListSessions(e.ctx)
+
+	matched, switched, err := e.switchSession(agent, sessions, interactiveKey, msg.SessionKey, query)
 	if err != nil {
 		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
 		return
 	}
-	agentSessions = e.applySessionFilter(agentSessions, sessions)
-
-	matched := e.matchSession(agentSessions, sessions, query)
 	if matched == nil {
 		e.reply(p, msg.ReplyCtx, fmt.Sprintf(e.i18n.T(MsgSwitchNoMatch), query))
 		return
 	}
-
-	slog.Info("cmdSwitch: cleaning up old session", "session_key", msg.SessionKey)
-	e.cleanupInteractiveState(interactiveKey)
-	slog.Info("cmdSwitch: cleanup done", "session_key", msg.SessionKey)
-
-	// NOTE: Do NOT call session.ClearHistory() on the returned Session.
-	// When switching back to a known agent_session_id, SwitchToAgentSession
-	// returns the *existing* Session object whose History reflects the
-	// original conversation; wiping it makes /history return empty after a
-	// /switch round-trip. When SwitchToAgentSession creates a fresh Session
-	// (no prior match), History is already nil, so preserving is a no-op.
-	_ = sessions.SwitchToAgentSession(msg.SessionKey, matched.ID, agent.Name(), matched.Summary)
-
-	shortID := matched.ID
-	if len(shortID) > 12 {
-		shortID = shortID[:12]
-	}
-	displayName := sessions.GetSessionName(matched.ID)
-	if displayName == "" {
-		displayName = matched.Summary
-	}
-	e.reply(p, msg.ReplyCtx,
-		e.i18n.Tf(MsgSwitchSuccess, displayName, shortID, matched.MessageCount))
+	e.reply(p, msg.ReplyCtx, e.switchConfirmation(agent, sessions, matched, switched))
 }
 
 // matchSession resolves a user query to an agent session. Priority:
@@ -9320,16 +9296,7 @@ func (e *Engine) cmdHistory(p Platform, msg *Message, args []string) {
 		n = v
 	}
 
-	entries := s.GetHistory(n)
-	agentSID := s.GetAgentSessionID()
-	if len(entries) == 0 && agentSID != "" {
-		if hp, ok := agent.(HistoryProvider); ok {
-			if agentEntries, err := hp.GetSessionHistory(e.ctx, agentSID, n); err == nil {
-				entries = agentEntries
-			}
-		}
-	}
-
+	entries := e.resolveHistory(agent, s, n)
 	if len(entries) == 0 {
 		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgHistoryEmpty))
 		return
@@ -9337,15 +9304,7 @@ func (e *Engine) cmdHistory(p Platform, msg *Message, args []string) {
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("📜 History (last %d):\n\n", len(entries)))
-	maxLen := e.historyEntryMaxLen()
-	for _, h := range entries {
-		icon := "👤"
-		if h.Role == "assistant" {
-			icon = "🤖"
-		}
-		content := truncateHistoryEntry(h.Content, maxLen)
-		sb.WriteString(fmt.Sprintf("%s [%s]\n%s\n\n", icon, h.Timestamp.Format("15:04:05"), content))
-	}
+	sb.WriteString(formatHistoryEntries(entries, e.historyEntryMaxLen()))
 	e.reply(p, msg.ReplyCtx, sb.String())
 }
 
@@ -12253,6 +12212,12 @@ func (e *Engine) handleCardNav(action string, sessionKey string) *Card {
 	if prefix == "act" && cmd == "/model" {
 		return e.handleModelCardAction(args, sessionKey)
 	}
+	// Same reason as /model: the generic path below can only redraw the list the
+	// button came from, so the switch confirmation and its preview never reach
+	// the user — the button looks like it did nothing.
+	if prefix == "act" && cmd == "/switch" {
+		return e.handleSwitchCardAction(args, sessionKey)
+	}
 
 	if prefix == "act" {
 		e.executeCardAction(cmd, args, sessionKey)
@@ -12584,24 +12549,6 @@ func (e *Engine) executeCardAction(cmd, args, sessionKey string) {
 
 	case "/delete-mode":
 		e.executeDeleteModeAction(sessionKey, args)
-
-	case "/switch":
-		if args == "" {
-			return
-		}
-		agent, sessions := e.sessionContextForKey(sessionKey)
-		agentSessions, err := agent.ListSessions(e.ctx)
-		if err != nil || len(agentSessions) == 0 {
-			return
-		}
-		agentSessions = e.applySessionFilter(agentSessions, sessions)
-		matched := e.matchSession(agentSessions, sessions, args)
-		if matched == nil {
-			return
-		}
-		e.cleanupInteractiveState(interactiveKey)
-		session := sessions.SwitchToAgentSession(sessionKey, matched.ID, agent.Name(), matched.Summary)
-		session.ClearHistory()
 
 	case "/dir":
 		fields := strings.Fields(args)
@@ -13564,35 +13511,14 @@ func (e *Engine) renderCurrentCard(sessionKey string) *Card {
 func (e *Engine) renderHistoryCard(sessionKey string) *Card {
 	agent, sessions := e.sessionContextForKey(sessionKey)
 	s := sessions.GetOrCreateActive(sessionKey)
-	entries := s.GetHistory(10)
-
-	agentSID := s.GetAgentSessionID()
-	if len(entries) == 0 && agentSID != "" {
-		if hp, ok := agent.(HistoryProvider); ok {
-			if agentEntries, err := hp.GetSessionHistory(e.ctx, agentSID, 10); err == nil {
-				entries = agentEntries
-			}
-		}
-	}
-
+	entries := e.resolveHistory(agent, s, 10)
 	if len(entries) == 0 {
 		return e.simpleCard(e.i18n.T(MsgCardTitleHistory), "turquoise", e.i18n.T(MsgHistoryEmpty))
 	}
 
-	var sb strings.Builder
-	maxLen := e.historyEntryMaxLen()
-	for _, h := range entries {
-		icon := "👤"
-		if h.Role == "assistant" {
-			icon = "🤖"
-		}
-		content := truncateHistoryEntry(h.Content, maxLen)
-		sb.WriteString(fmt.Sprintf("%s [%s]\n%s\n\n", icon, h.Timestamp.Format("15:04:05"), content))
-	}
-
 	return NewCard().
 		Title(e.i18n.Tf(MsgCardTitleHistoryLast, len(entries)), "turquoise").
-		Markdown(sb.String()).
+		Markdown(formatHistoryEntries(entries, e.historyEntryMaxLen())).
 		Buttons(e.cardBackButton()).
 		Build()
 }

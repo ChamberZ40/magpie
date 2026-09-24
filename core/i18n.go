@@ -366,6 +366,7 @@ const (
 	MsgCardTitleMode             MsgKey = "card_title_mode"
 	MsgCardTitleSessions         MsgKey = "card_title_sessions"
 	MsgCardTitleSessionsPaged    MsgKey = "card_title_sessions_paged"
+	MsgCardTitleSwitched         MsgKey = "card_title_switched"
 	MsgCardTitleCurrentSession   MsgKey = "card_title_current_session"
 	MsgCardTitleHistory          MsgKey = "card_title_history"
 	MsgCardTitleHistoryLast      MsgKey = "card_title_history_last"
@@ -524,6 +525,7 @@ const (
 	MsgDeleteModeMissingSession MsgKey = "delete_mode_missing_session"
 
 	MsgSwitchSuccess   MsgKey = "switch_success"
+	MsgSwitchPreview   MsgKey = "switch_preview"
 	MsgSwitchNoMatch   MsgKey = "switch_no_match"
 	MsgSwitchNoSession MsgKey = "switch_no_session"
 
@@ -2695,6 +2697,10 @@ var messages = map[MsgKey]map[Language]string{
 		LangEnglish: "%s Sessions (%d) — %d/%d", LangChinese: "%s 会话列表 (%d) · 第 %d/%d 页", LangTraditionalChinese: "%s 會話列表 (%d) · 第 %d/%d 頁",
 		LangJapanese: "%s セッション (%d) · %d/%d ページ", LangSpanish: "Sesiones de %s (%d) · Página %d/%d",
 	},
+	MsgCardTitleSwitched: {
+		LangEnglish: "Switched Session", LangChinese: "已切换会话", LangTraditionalChinese: "已切換會話",
+		LangJapanese: "セッション切り替え", LangSpanish: "Sesión cambiada",
+	},
 	MsgCardTitleCurrentSession: {
 		LangEnglish: "Current Session", LangChinese: "当前会话", LangTraditionalChinese: "當前會話",
 		LangJapanese: "現在のセッション", LangSpanish: "Sesión actual",
@@ -3248,6 +3254,13 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "✅ 已切換到：%s（%s，%d 則訊息）",
 		LangJapanese:           "✅ 切り替え：%s（%s、%d件）",
 		LangSpanish:            "✅ Cambiado a: %s (%s, %d mensajes)",
+	},
+	MsgSwitchPreview: {
+		LangEnglish:            "📜 Last %d messages:",
+		LangChinese:            "📜 最近 %d 条消息：",
+		LangTraditionalChinese: "📜 最近 %d 則訊息：",
+		LangJapanese:           "📜 直近 %d 件のメッセージ：",
+		LangSpanish:            "📜 Últimos %d mensajes:",
 	},
 	MsgSwitchNoMatch: {
 		LangEnglish:            "❌ No session matching %q",
