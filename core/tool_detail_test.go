@@ -79,3 +79,50 @@ func TestMergeRichToolResultDetailLevels(t *testing.T) {
 		}
 	})
 }
+
+// A successful call's output is the flood, which is why "summary" drops it. A
+// failed call's output is the opposite: the row already says the command
+// failed, and the output is the only thing that says why.
+//
+// Dropping it is what pushes people to tool_detail = "full", where every
+// successful call floods the card again to buy back the one error they wanted.
+func TestMergeRichToolResultKeepsFailureOutputAtSummary(t *testing.T) {
+	exit := 2
+	failed := false
+	event := Event{
+		Type:         EventToolResult,
+		ToolName:     "Bash",
+		ToolInput:    "./deploy.sh",
+		ToolStatus:   "failed",
+		ToolExitCode: &exit,
+		ToolSuccess:  &failed,
+	}
+	const output = "ssh: connect to host db01 port 22: Connection refused"
+
+	steps := mergeRichToolResult(nil, event, output, 500, ToolDetailSummary)
+	if len(steps) != 1 {
+		t.Fatalf("steps = %#v, want exactly one", steps)
+	}
+	if steps[0].Result != output {
+		t.Errorf("Result = %q, want a failed call to keep the output that explains it", steps[0].Result)
+	}
+}
+
+// An outcome the classifier cannot place is not a success, and its output is
+// the only way to find out what it was.
+func TestMergeRichToolResultKeepsUnclassifiedOutputAtSummary(t *testing.T) {
+	event := Event{
+		Type:       EventToolResult,
+		ToolName:   "Bash",
+		ToolInput:  "./deploy.sh",
+		ToolStatus: "cancelled",
+	}
+
+	steps := mergeRichToolResult(nil, event, "interrupted after 3 of 9 steps", 500, ToolDetailSummary)
+	if len(steps) != 1 {
+		t.Fatalf("steps = %#v, want exactly one", steps)
+	}
+	if steps[0].Result == "" {
+		t.Error("Result was dropped — an unrecognized outcome is not a success")
+	}
+}

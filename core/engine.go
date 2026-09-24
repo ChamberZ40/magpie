@@ -6315,7 +6315,13 @@ func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen in
 	steps[idx].Status = strings.TrimSpace(event.ToolStatus)
 	steps[idx].ExitCode = event.ToolExitCode
 	steps[idx].Success = event.ToolSuccess
-	if detail == ToolDetailFull {
+	// A call that did not succeed keeps its output at every level. The mark on
+	// the row says the command failed; the output is the only thing that says
+	// why, and it is not the flood "summary" exists to stop — failures are the
+	// exception. Unknown counts as not-succeeded for the same reason it does in
+	// ClassifyToolResult: the output is how you find out what happened.
+	if detail == ToolDetailFull ||
+		ClassifyToolResult(steps[idx].Status, steps[idx].ExitCode, steps[idx].Success) != ToolOutcomeSucceeded {
 		steps[idx].Result = result
 	}
 	steps[idx].Done = true

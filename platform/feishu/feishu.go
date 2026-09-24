@@ -15,7 +15,6 @@ import (
 	"net/netip"
 	"net/url"
 	"regexp"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -6333,31 +6332,18 @@ func richStepBody(step core.ToolStep, lang string) string {
 	return row
 }
 
-var (
-	richStepStatusFailed = []string{"failed", "failure", "error", "denied", "rejected"}
-	richStepStatusOK     = []string{"completed", "complete", "success", "succeeded", "ok", "done", "finished"}
-)
-
 // richStepFailureMark returns the trailing mark for a tool row, or "" when the
-// call succeeded or has not reported yet. Three signals decide it, most
-// explicit first: the success flag, then a status word the table recognizes,
-// then the exit code. A status none of them covers is returned as-is, because
-// calling an unknown outcome a success is the one answer that misleads.
+// call succeeded or has not reported yet. core owns the verdict so that this
+// mark and core's "keep the output at summary" decision cannot drift apart;
+// what belongs here is only how to say it.
+//
+// An outcome core could not classify is echoed as-is, because calling an
+// unknown outcome a success is the one answer that misleads.
 func richStepFailureMark(step core.ToolStep, lang string) string {
-	status := strings.ToLower(strings.TrimSpace(step.Status))
-	switch {
-	case step.Success != nil:
-		if *step.Success {
-			return ""
-		}
-	case slices.Contains(richStepStatusFailed, status):
-	case step.ExitCode != nil:
-		if *step.ExitCode == 0 {
-			return ""
-		}
-	case status == "" || slices.Contains(richStepStatusOK, status):
+	switch core.ClassifyToolResult(step.Status, step.ExitCode, step.Success) {
+	case core.ToolOutcomeSucceeded:
 		return ""
-	default:
+	case core.ToolOutcomeUnknown:
 		return strings.TrimSpace(step.Status)
 	}
 	mark := "✗ " + core.Translate(core.MsgRichToolFailed, core.Language(lang))
