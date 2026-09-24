@@ -3202,7 +3202,7 @@ func (e *Engine) handleMessage(p Platform, msg *Message) {
 			// and the queue append. Re-try TryLock — if it succeeds, no one is
 			// draining the queue so we must start a processor ourselves.
 			if session.TryLock() {
-				go e.drainOrphanedQueue(session, sessions, interactiveKey, agent, resolvedWorkspace)
+				e.goDrainOrphanedQueue(session, sessions, interactiveKey, agent, resolvedWorkspace)
 			}
 			return
 		}
@@ -3405,6 +3405,17 @@ func (e *Engine) ensureInteractiveStateForQueueing(key string, p Platform, reply
 // has already exited. It processes all pending messages in the state, similar
 // to the drain loop in processInteractiveMessageWith but as a standalone
 // goroutine.
+// goDrainOrphanedQueue runs drainOrphanedQueue as a tracked turn: it processes
+// queued messages and saves the session like any other turn, so Stop must wait
+// for it. The caller holds the session lock; a refused drain releases it.
+func (e *Engine) goDrainOrphanedQueue(session *Session, sessions *SessionManager, interactiveKey string, agent Agent, workspaceDir string) {
+	if !e.goTurn(func() {
+		e.drainOrphanedQueue(session, sessions, interactiveKey, agent, workspaceDir)
+	}) {
+		session.Unlock()
+	}
+}
+
 func (e *Engine) drainOrphanedQueue(session *Session, sessions *SessionManager, interactiveKey string, agent Agent, workspaceDir string) {
 	unlocked := false
 	defer func() {

@@ -88,3 +88,37 @@ func TestStopCountsTheUnsolicitedReader(t *testing.T) {
 		t.Fatal("waitForTurns still blocked after the reader exited")
 	}
 }
+
+// A queued message can be picked up by a drain started from the message
+// handler rather than by the turn that queued it. That drain runs a whole turn
+// and saves the session like any other, so once Stop has begun it must be
+// refused — and the session lock it was handed given back.
+func TestOrphanedQueueDrainIsRefusedOnceStopping(t *testing.T) {
+	e := NewEngine("test", &stubAgent{}, []Platform{&stubPlatformEngine{n: "test"}}, "", LangEnglish)
+	key := "test:chat:user"
+	state := &interactiveState{
+		agentSession:    &stubAgentSession{},
+		pendingMessages: []queuedMessage{{messageID: "m1", userMessageTimeMs: time.Now().UnixMilli()}},
+	}
+	_ = e.Stop()
+	// Registered after Stop, which clears the table: the drain must be
+	// refused for being late, not skipped for finding nothing to do.
+	e.interactiveMu.Lock()
+	e.interactiveStates[key] = state
+	e.interactiveMu.Unlock()
+
+	session := &Session{}
+	session.TryLock()
+	e.goDrainOrphanedQueue(session, nil, key, &stubAgent{}, "")
+	time.Sleep(50 * time.Millisecond)
+
+	state.mu.Lock()
+	pending := len(state.pendingMessages)
+	state.mu.Unlock()
+	if pending != 1 {
+		t.Errorf("pending = %d, want the queue untouched — a drain ran after Stop", pending)
+	}
+	if !session.TryLock() {
+		t.Error("session still locked — a refused drain must release it")
+	}
+}
