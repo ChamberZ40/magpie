@@ -383,11 +383,12 @@ func TestSend_WithImages_PassesImageArgsAndDefaultPrompt(t *testing.T) {
 
 	argsFile := filepath.Join(workDir, "args.txt")
 	script := "#!/bin/sh\n" +
-		"printf '%s\\n' \"$@\" > \"$CODEX_ARGS_FILE\"\n" +
+		fakeCodexArgsCaptureSh +
 		"printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"thread-1\"}'\n" +
 		"printf '%s\\n' '{\"type\":\"turn.completed\"}'\n"
 	powershellScript := `
-[IO.File]::WriteAllLines($env:CODEX_ARGS_FILE, (fakeCodexArgs))
+[IO.File]::WriteAllLines("$env:CODEX_ARGS_FILE.tmp", (fakeCodexArgs))
+Move-Item -Force "$env:CODEX_ARGS_FILE.tmp" $env:CODEX_ARGS_FILE
 [Console]::Out.WriteLine('{"type":"thread.started","thread_id":"thread-1"}')
 [Console]::Out.WriteLine('{"type":"turn.completed"}')
 `
@@ -446,10 +447,11 @@ func TestSend_ResumeWithImages_PlacesSessionBeforeImageFlags(t *testing.T) {
 
 	argsFile := filepath.Join(workDir, "args.txt")
 	script := "#!/bin/sh\n" +
-		"printf '%s\\n' \"$@\" > \"$CODEX_ARGS_FILE\"\n" +
+		fakeCodexArgsCaptureSh +
 		"printf '%s\\n' '{\"type\":\"turn.completed\"}'\n"
 	powershellScript := `
-[IO.File]::WriteAllLines($env:CODEX_ARGS_FILE, (fakeCodexArgs))
+[IO.File]::WriteAllLines("$env:CODEX_ARGS_FILE.tmp", (fakeCodexArgs))
+Move-Item -Force "$env:CODEX_ARGS_FILE.tmp" $env:CODEX_ARGS_FILE
 [Console]::Out.WriteLine('{"type":"turn.completed"}')
 `
 	writeFakeCodexScript(t, binDir, script, powershellScript)
@@ -494,12 +496,13 @@ func TestSend_UsesStdinForMultilinePrompt(t *testing.T) {
 	argsFile := filepath.Join(workDir, "args.txt")
 	stdinFile := filepath.Join(workDir, "stdin.txt")
 	script := "#!/bin/sh\n" +
-		"printf '%s\\n' \"$@\" > \"$CODEX_ARGS_FILE\"\n" +
+		fakeCodexArgsCaptureSh +
 		"cat > \"$CODEX_STDIN_FILE\"\n" +
 		"printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"thread-stdin\"}'\n" +
 		"printf '%s\\n' '{\"type\":\"turn.completed\"}'\n"
 	powershellScript := `
-[IO.File]::WriteAllLines($env:CODEX_ARGS_FILE, (fakeCodexArgs))
+[IO.File]::WriteAllLines("$env:CODEX_ARGS_FILE.tmp", (fakeCodexArgs))
+Move-Item -Force "$env:CODEX_ARGS_FILE.tmp" $env:CODEX_ARGS_FILE
 [IO.File]::WriteAllText($env:CODEX_STDIN_FILE, [Console]::In.ReadToEnd())
 [Console]::Out.WriteLine('{"type":"thread.started","thread_id":"thread-stdin"}')
 [Console]::Out.WriteLine('{"type":"turn.completed"}')
@@ -671,8 +674,9 @@ func TestWriteFakeCodexScript_PreservesArgsWithSpaces(t *testing.T) {
 	}
 
 	argsFile := filepath.Join(workDir, "args.txt")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CODEX_ARGS_FILE\"\n"
-	powershellScript := `[IO.File]::WriteAllLines($env:CODEX_ARGS_FILE, (fakeCodexArgs))
+	script := "#!/bin/sh\n" + fakeCodexArgsCaptureSh
+	powershellScript := `[IO.File]::WriteAllLines("$env:CODEX_ARGS_FILE.tmp", (fakeCodexArgs))
+Move-Item -Force "$env:CODEX_ARGS_FILE.tmp" $env:CODEX_ARGS_FILE
 `
 	writeFakeCodexScript(t, binDir, script, powershellScript)
 	t.Setenv("CODEX_ARGS_FILE", argsFile)
@@ -731,6 +735,13 @@ func writeFakeCodexScript(t *testing.T, dir, shellScript, powershellScript strin
 		t.Fatalf("write fake codex: %v", err)
 	}
 }
+
+// fakeCodexArgsCaptureSh writes the invocation's args where the test can read
+// them. The write goes to a temp file and is renamed into place, because
+// waitForArgsFile below returns on the first non-empty read: a plain
+// `> "$CODEX_ARGS_FILE"` truncates first and flushes in chunks, so the poller
+// could pick up a partial argument list and report args that were never missing.
+const fakeCodexArgsCaptureSh = "printf '%s\\n' \"$@\" > \"$CODEX_ARGS_FILE.tmp\" && mv \"$CODEX_ARGS_FILE.tmp\" \"$CODEX_ARGS_FILE\"\n"
 
 func waitForArgsFile(t *testing.T, path string) []string {
 	t.Helper()
