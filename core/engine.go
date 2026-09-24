@@ -6440,16 +6440,14 @@ func matchRichToolStep(steps []ToolStep, useID, toolName string) int {
 		if toolName != "" && strings.TrimSpace(steps[i].Name) == toolName {
 			return i
 		}
-		if oldestPending == -1 {
+		// A call carrying a different id is provably someone else's.
+		if oldestPending == -1 && (useID == "" || steps[i].UseID == "") {
 			oldestPending = i
 		}
 	}
-	// A nameless result still belongs to a call in flight; without a name the
-	// only thing left to go on is order.
-	if toolName == "" {
-		return oldestPending
-	}
-	return -1
+	// No id and no name to go on: results come back in call order, so the
+	// oldest call in flight is the best remaining match.
+	return oldestPending
 }
 
 // notifyDroppedQueuedMessages drains pendingMessages from the state and

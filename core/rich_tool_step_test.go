@@ -169,3 +169,29 @@ func TestMergeRichToolResultRecordsHowLongTheCallTook(t *testing.T) {
 		t.Errorf("Duration = %v for a call never seen starting, want 0", orphan.Duration)
 	}
 }
+
+// Without a call id, a result whose name matches no pending call still belongs
+// to the oldest call in flight. Inventing a new row for it left the real call
+// rendering "running" for the rest of the turn.
+func TestMergeRichToolResultFallsBackToTheOldestCallOfAnyName(t *testing.T) {
+	steps := []ToolStep{{Kind: ToolStepKindTool, Name: "shell"}}
+
+	got := mergeRichToolResult(steps, Event{ToolName: "Bash", ToolStatus: "completed"}, "", 200, ToolDetailSummary)
+	if len(got) != 1 {
+		t.Fatalf("steps = %d, want the result paired with the pending call, not a new row", len(got))
+	}
+	if !got[0].Done {
+		t.Error("pending call still not done — it would render running forever")
+	}
+}
+
+// The any-name fallback never hands a result to a call whose own id says it is
+// a different call.
+func TestMergeRichToolResultFallbackSkipsACallWithAnotherID(t *testing.T) {
+	steps := []ToolStep{{Kind: ToolStepKindTool, Name: "shell", UseID: "a"}}
+
+	got := mergeRichToolResult(steps, Event{ToolName: "Bash", ToolUseID: "b"}, "", 200, ToolDetailSummary)
+	if got[0].Done {
+		t.Error("call a was completed by the result of call b")
+	}
+}
