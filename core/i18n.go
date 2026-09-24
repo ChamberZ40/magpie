@@ -396,7 +396,8 @@ const (
 
 	// Per-call tool panel chrome: the verdict shown in the header next to the
 	// tool name and its duration, and the label above the raw output inside.
-	MsgRichToolFailed MsgKey = "rich_tool_failed"
+	MsgRichToolFailed    MsgKey = "rich_tool_failed"
+	MsgRichToolSucceeded MsgKey = "rich_tool_succeeded"
 
 	// Rich-card footer context label, plus the remaining-budget suffix that is
 	// appended only once usage crosses richFooterCtxAlertPct.
@@ -2687,9 +2688,15 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "本輪未呼叫工具",
 		LangJapanese:           "ツールの呼び出しなし", LangSpanish: "No se llamó a ninguna herramienta",
 	},
+	// The Chinese cards say Failed/Success in English on purpose: the operator
+	// asked for the same verdict words as the English card.
 	MsgRichToolFailed: {
-		LangEnglish: "Failed", LangChinese: "失败", LangTraditionalChinese: "失敗",
+		LangEnglish: "Failed", LangChinese: "Failed", LangTraditionalChinese: "Failed",
 		LangJapanese: "失敗", LangSpanish: "Error",
+	},
+	MsgRichToolSucceeded: {
+		LangEnglish: "Success", LangChinese: "Success", LangTraditionalChinese: "Success",
+		LangJapanese: "成功", LangSpanish: "Éxito",
 	},
 	MsgCardTitleMode: {
 		LangEnglish: "Permission Mode", LangChinese: "权限模式", LangTraditionalChinese: "權限模式",

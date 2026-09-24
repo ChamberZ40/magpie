@@ -3,6 +3,7 @@ package feishu
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ChamberZ40/magpie/core"
 )
@@ -29,6 +30,13 @@ func elementText(t *testing.T, elem map[string]any) map[string]any {
 
 func elementContent(t *testing.T, elem map[string]any) string {
 	t.Helper()
+	if elem["tag"] == "markdown" {
+		content, ok := elem["content"].(string)
+		if !ok {
+			t.Fatalf("element = %#v, want string content", elem)
+		}
+		return content
+	}
 	content, ok := elementText(t, elem)["content"].(string)
 	if !ok {
 		t.Fatalf("element = %#v, want string content", elem)
@@ -50,9 +58,13 @@ func TestRichStepElements_SplitsTitleDetailAndOutput(t *testing.T) {
 		t.Fatalf("elements = %#v (%d), want title, detail and output", elements, len(elements))
 	}
 
-	// The title says what ran; the target belongs on its own row below it.
-	if title := elementContent(t, elements[0]); title != "Run tests" {
-		t.Errorf("title = %q, want the action alone", title)
+	// The title says what ran, in bold, and how it went, in green; the target
+	// belongs on its own row below it.
+	if title := elementContent(t, elements[0]); title != "**Run tests** · <font color='green'>Success</font>" {
+		t.Errorf("title = %q, want the bold action and a green Success", title)
+	}
+	if got := elements[0]["text_size"]; got != "notation" {
+		t.Errorf("title text_size = %v, want notation", got)
 	}
 	if elements[0]["icon"] == nil {
 		t.Error("title element carries no icon — the row loses its glyph")
@@ -106,10 +118,11 @@ func TestRichStepElements_FailureMarkRidesOnTheTitleRow(t *testing.T) {
 
 	elements := richStepElements(step, "en")
 	title := elementContent(t, elements[0])
-	for _, want := range []string{"✗", "Failed", "exit 2"} {
-		if !strings.Contains(title, want) {
-			t.Errorf("title = %q, want it to contain %q", title, want)
-		}
+	if !strings.Contains(title, "<font color='red'>Failed (exit 2)</font>") {
+		t.Errorf("title = %q, want a red Failed with the exit code", title)
+	}
+	if strings.Contains(title, "✗") {
+		t.Errorf("title = %q, want the colour alone to carry the verdict", title)
 	}
 	if got := elementContent(t, elements[len(elements)-1]); !strings.Contains(got, "Connection refused") {
 		t.Errorf("last element = %q, want the output that explains the failure", got)
@@ -205,5 +218,53 @@ func TestBuildCollapsiblePanel_TitleIsAtNotationSize(t *testing.T) {
 	}
 	if got := title["text_size"]; got != "notation" {
 		t.Errorf("title text_size = %v, want notation", got)
+	}
+}
+
+// A call still running has no verdict yet: no mark, and no colour.
+func TestRichStepElements_RunningCallHasNoMark(t *testing.T) {
+	step := core.ToolStep{Kind: core.ToolStepKindTool, Name: "Read", Summary: `{"file_path":"/a/KNOWLEDGE_ROUTE.md"}`}
+
+	title := elementContent(t, richStepElements(step, "en")[0])
+	if strings.Contains(title, "<font") || strings.Contains(title, "·") {
+		t.Errorf("title = %q, want no verdict while the call runs", title)
+	}
+}
+
+// The duration rides in the title, as in "Read (72 ms)".
+func TestRichStepElements_TitleCarriesTheDuration(t *testing.T) {
+	step := core.ToolStep{Kind: core.ToolStepKindTool, Name: "Read", Status: "completed", Done: true, Duration: 72 * time.Millisecond}
+
+	title := elementContent(t, richStepElements(step, "en")[0])
+	if !strings.HasPrefix(title, "**Read (72 ms)**") {
+		t.Errorf("title = %q, want it to open with the bold name and duration", title)
+	}
+}
+
+// Tool names are the agent's text, not markup: an MCP name full of
+// underscores must not turn into italics.
+func TestRichStepElements_TitleEscapesMarkdown(t *testing.T) {
+	step := core.ToolStep{Kind: core.ToolStepKindTool, Name: "mcp__lark__get_doc*", Status: "completed", Done: true}
+
+	title := elementContent(t, richStepElements(step, "en")[0])
+	inner := strings.TrimSuffix(strings.SplitN(title, "** ·", 2)[0], "**")
+	inner = strings.TrimPrefix(inner, "**")
+	for _, raw := range []string{"_", "*"} {
+		if strings.Contains(inner, raw) {
+			t.Errorf("title = %q, want %q escaped inside the bold span", title, raw)
+		}
+	}
+}
+
+func TestFormatStepDuration(t *testing.T) {
+	cases := map[time.Duration]string{
+		72 * time.Millisecond:   "72 ms",
+		1260 * time.Millisecond: "1.3 s",
+		125 * time.Second:       "2m 5s",
+	}
+	for d, want := range cases {
+		if got := formatStepDuration(d); got != want {
+			t.Errorf("formatStepDuration(%v) = %q, want %q", d, got, want)
+		}
 	}
 }

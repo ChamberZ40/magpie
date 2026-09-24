@@ -2,6 +2,7 @@ package core
 
 import (
 	"testing"
+	"time"
 )
 
 // The verdict is one glyph on a row, so it costs nothing at summary. The raw
@@ -149,5 +150,22 @@ func TestMergeRichToolResultSkipsCallsThatAlreadyFinished(t *testing.T) {
 	}
 	if got[1].Status != "failed" {
 		t.Errorf("second call Status = %q, want the failure recorded on the unfinished call", got[1].Status)
+	}
+}
+
+// A row says how long its call took. The clock starts when the call is seen
+// and stops when its result lands, so a call with no start has no duration
+// rather than an invented one.
+func TestMergeRichToolResultRecordsHowLongTheCallTook(t *testing.T) {
+	steps := []ToolStep{{Kind: ToolStepKindTool, Name: "Read", UseID: "u1", StartedAt: time.Now().Add(-2 * time.Second)}}
+
+	got := mergeRichToolResult(steps, Event{ToolName: "Read", ToolUseID: "u1"}, "", 200, ToolDetailSummary)[0]
+	if got.Duration < 2*time.Second || got.Duration > time.Minute {
+		t.Errorf("Duration = %v, want about 2s", got.Duration)
+	}
+
+	orphan := mergeRichToolResult(nil, Event{ToolName: "Read"}, "", 200, ToolDetailSummary)[0]
+	if orphan.Duration != 0 {
+		t.Errorf("Duration = %v for a call never seen starting, want 0", orphan.Duration)
 	}
 }

@@ -36,11 +36,14 @@ func TestRichStepBody_IsOneLineOfActionAndTarget(t *testing.T) {
 			t.Errorf("body = %q, want it to contain %q", got, want)
 		}
 	}
-	// A successful call is the normal case; saying so on every row is noise.
-	for _, unwanted := range []string{"status:", "exit:", "✓", "Succeeded"} {
+	// A successful row says so in one word, not with the raw fields.
+	for _, unwanted := range []string{"status:", "exit:"} {
 		if strings.Contains(got, unwanted) {
 			t.Errorf("body = %q, want no %q on a successful row", got, unwanted)
 		}
+	}
+	if !strings.Contains(got, "Success") {
+		t.Errorf("body = %q, want the Success verdict", got)
 	}
 }
 
@@ -60,7 +63,7 @@ func TestRichStepBody_MarksFailuresWithTheExitCode(t *testing.T) {
 
 	got := richStepBody(step, "en")
 
-	for _, want := range []string{"./deploy.sh", "✗", "Failed", "exit 2"} {
+	for _, want := range []string{"./deploy.sh", "Failed", "exit 2"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("body = %q, want it to contain %q", got, want)
 		}
@@ -75,7 +78,7 @@ func TestRichStepBody_MarksAFailureKnownOnlyByItsExitCode(t *testing.T) {
 		ExitCode: &exit, Done: true,
 	}
 
-	if got := richStepBody(step, "en"); !strings.Contains(got, "✗") {
+	if got := richStepBody(step, "en"); !strings.Contains(got, "Failed") {
 		t.Errorf("body = %q, want a failure mark for a non-zero exit code", got)
 	}
 }
@@ -92,8 +95,8 @@ func TestRichStepBody_EchoesAStatusItCannotJudge(t *testing.T) {
 	if !strings.Contains(got, "cancelled") {
 		t.Errorf("body = %q, want the unrecognized status echoed", got)
 	}
-	if strings.Contains(got, "✗") {
-		t.Errorf("body = %q, want no failure mark for a status that is not a failure", got)
+	if strings.Contains(got, "Failed") || strings.Contains(got, "Success") {
+		t.Errorf("body = %q, want no verdict for a status that is not a failure", got)
 	}
 }
 
@@ -131,7 +134,7 @@ func TestRichStepBody_FailureMarkIsLocalized(t *testing.T) {
 
 	for _, tc := range []struct{ lang, want string }{
 		{"en", "Failed"},
-		{"zh", "失败"},
+		{"zh", "Failed"},
 		{"ja", "失敗"},
 	} {
 		if got := richStepBody(step, tc.lang); !strings.Contains(got, tc.want) {

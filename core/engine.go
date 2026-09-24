@@ -5281,10 +5281,11 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					break
 				}
 				toolSteps = append(toolSteps, ToolStep{
-					Kind:    ToolStepKindTool,
-					Name:    event.ToolName,
-					UseID:   event.ToolUseID,
-					Summary: truncateIf(event.ToolInput, e.display.ToolMaxLen),
+					Kind:      ToolStepKindTool,
+					Name:      event.ToolName,
+					UseID:     event.ToolUseID,
+					Summary:   truncateIf(event.ToolInput, e.display.ToolMaxLen),
+					StartedAt: time.Now(),
 				})
 				if cardMessageID == nil {
 					card := buildResolvedRichCard(CardStatusWorking, toolSteps, partialText, true, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
@@ -6389,6 +6390,9 @@ func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen in
 	if detail == ToolDetailFull ||
 		ClassifyToolResult(steps[idx].Status, steps[idx].ExitCode, steps[idx].Success) != ToolOutcomeSucceeded {
 		steps[idx].Result = result
+	}
+	if !steps[idx].Done && !steps[idx].StartedAt.IsZero() {
+		steps[idx].Duration = time.Since(steps[idx].StartedAt)
 	}
 	steps[idx].Done = true
 	return steps

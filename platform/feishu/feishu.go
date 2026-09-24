@@ -6323,10 +6323,11 @@ func richStepDisplayName(step core.ToolStep) string {
 // "this half matters less". The card-too-big fallback flattens the same pieces
 // back into one line. Both read this function so they cannot drift.
 type richStepParts struct {
-	Title  string // the action, e.g. "Run tests"
-	Detail string // the target — empty when it would only repeat the title
-	Mark   string // the failure mark, or "" for a clean or still-running call
-	Output string // the raw output — empty unless this row keeps it
+	Title     string // the action and how long it took, e.g. "Run tests (1.3 s)"
+	Detail    string // the target — empty when it would only repeat the title
+	Mark      string // the verdict, or "" for a call still running
+	MarkColor string // the card colour for Mark, or "" when Mark is not a verdict
+	Output    string // the raw output — empty unless this row keeps it
 }
 
 func splitRichStep(step core.ToolStep, lang string) richStepParts {
@@ -6340,14 +6341,32 @@ func splitRichStep(step core.ToolStep, lang string) richStepParts {
 		return richStepParts{Title: detail}
 	}
 
-	parts := richStepParts{Title: name, Mark: richStepFailureMark(step, lang)}
+	parts := richStepParts{Title: name}
+	if step.Duration > 0 {
+		parts.Title = fmt.Sprintf("%s (%s)", name, formatStepDuration(step.Duration))
+	}
+	parts.Mark, parts.MarkColor = richStepMark(step, lang)
 	if detail != name {
 		parts.Detail = detail
 	}
-	if result := strings.TrimSpace(step.Result); result != "" && !richStepSkipsResult(step, parts.Mark) {
+	if result := strings.TrimSpace(step.Result); result != "" && !richStepSkipsResult(step, parts.MarkColor) {
 		parts.Output = result
 	}
 	return parts
+}
+
+// formatStepDuration says how long a call ran at the precision a reader
+// wants: milliseconds for quick calls, tenths of a second up to a minute,
+// whole seconds beyond.
+func formatStepDuration(d time.Duration) string {
+	switch {
+	case d < time.Second:
+		return fmt.Sprintf("%d ms", d.Milliseconds())
+	case d < time.Minute:
+		return fmt.Sprintf("%.1f s", d.Seconds())
+	}
+	d = d.Round(time.Second)
+	return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
 }
 
 // richStepBody renders one call as one line: what the tool did and what it did
@@ -6379,34 +6398,43 @@ func richStepBody(step core.ToolStep, lang string) string {
 	return row
 }
 
-// richStepFailureMark returns the trailing mark for a tool row, or "" when the
-// call succeeded or has not reported yet. core owns the verdict so that this
-// mark and core's "keep the output at summary" decision cannot drift apart;
-// what belongs here is only how to say it.
+// richStepMark returns a finished call's verdict and its colour: green
+// Success, red Failed (with the exit code when there is one). A call still
+// running has no verdict yet. core owns the verdict so that this mark and
+// core's "keep the output at summary" decision cannot drift apart; what belongs
+// here is only how to say it.
 //
-// An outcome core could not classify is echoed as-is, because calling an
-// unknown outcome a success is the one answer that misleads.
-func richStepFailureMark(step core.ToolStep, lang string) string {
+// An outcome core could not classify is echoed as-is and uncoloured, because
+// calling an unknown outcome a success is the one answer that misleads.
+func richStepMark(step core.ToolStep, lang string) (mark, color string) {
+	if !step.Done {
+		return "", ""
+	}
 	switch core.ClassifyToolResult(step.Status, step.ExitCode, step.Success) {
 	case core.ToolOutcomeSucceeded:
-		return ""
+		return core.Translate(core.MsgRichToolSucceeded, core.Language(lang)), richStepSucceededColor
 	case core.ToolOutcomeUnknown:
-		return strings.TrimSpace(step.Status)
+		return strings.TrimSpace(step.Status), ""
 	}
-	mark := "✗ " + core.Translate(core.MsgRichToolFailed, core.Language(lang))
+	mark = core.Translate(core.MsgRichToolFailed, core.Language(lang))
 	if step.ExitCode != nil && *step.ExitCode != 0 {
-		return fmt.Sprintf("%s (exit %d)", mark, *step.ExitCode)
+		mark = fmt.Sprintf("%s (exit %d)", mark, *step.ExitCode)
 	}
-	return mark
+	return mark, richStepFailedColor
 }
+
+const (
+	richStepSucceededColor = "green"
+	richStepFailedColor    = "red"
+)
 
 // richStepSkipsResult reports whether this row drops the output it was handed.
 //
 // Only a clean run is dropped. core keeps a failed call's output at every
 // detail level precisely so this row can show it, and a tool opting out of its
 // own success payload must not take the error down with it.
-func richStepSkipsResult(step core.ToolStep, failureMark string) bool {
-	if failureMark != "" {
+func richStepSkipsResult(step core.ToolStep, markColor string) bool {
+	if markColor != richStepSucceededColor {
 		return false
 	}
 	desc := resolveToolDescriptor(step.Name)
@@ -6536,11 +6564,7 @@ func richStepElements(step core.ToolStep, lang string) []map[string]any {
 		return []map[string]any{elem}
 	}
 
-	title := parts.Title
-	if parts.Mark != "" {
-		title += "  " + parts.Mark
-	}
-	head := richStepTextElement(title, false, false)
+	head := richStepHeadElement(parts)
 	head["icon"] = map[string]any{"tag": "standard_icon", "token": buildToolDisplay(step.Name, step.Summary).IconToken}
 
 	elements := []map[string]any{head}
@@ -6550,6 +6574,44 @@ func richStepElements(step core.ToolStep, lang string) []map[string]any {
 		}
 	}
 	return elements
+}
+
+// richStepHeadElement builds a call's title row: the title in bold, then the
+// verdict in its colour. It is markdown rather than plain text because a text
+// node has one colour, and only the verdict should carry one.
+func richStepHeadElement(parts richStepParts) map[string]any {
+	content := "**" + escapeLarkMarkdown(parts.Title) + "**"
+	switch {
+	case parts.Mark != "" && parts.MarkColor != "":
+		content += fmt.Sprintf(" · <font color='%s'>%s</font>", parts.MarkColor, escapeLarkMarkdown(parts.Mark))
+	case parts.Mark != "":
+		content += " · " + escapeLarkMarkdown(parts.Mark)
+	}
+	return map[string]any{
+		"tag":       "markdown",
+		"content":   content,
+		"text_size": "notation",
+	}
+}
+
+// larkMarkdownEscaper turns the characters Feishu markdown would read as markup
+// into HTML entities, so agent-supplied text such as an MCP tool name full of
+// underscores renders as written.
+var larkMarkdownEscaper = strings.NewReplacer(
+	"&", "&amp;",
+	"<", "&lt;",
+	">", "&gt;",
+	"*", "&#42;",
+	"_", "&#95;",
+	"~", "&#126;",
+	"`", "&#96;",
+	"[", "&#91;",
+	"]", "&#93;",
+	"\\", "&#92;",
+)
+
+func escapeLarkMarkdown(s string) string {
+	return larkMarkdownEscaper.Replace(s)
 }
 
 // richStepTextElement builds one row of a step. indent is what puts a row under

@@ -75,6 +75,10 @@ type ToolStep struct {
 	ExitCode *int   // optional process exit code
 	Success  *bool  // optional success flag
 	Done     bool   // true once a tool result has been observed
+	// StartedAt is when the call was seen; Duration is how long it ran until
+	// its result landed. Both stay zero when the start was never observed.
+	StartedAt time.Time
+	Duration  time.Duration
 }
 
 // RichCardSupporter is an optional interface for platforms that can build
