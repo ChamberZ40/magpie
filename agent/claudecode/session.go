@@ -953,6 +953,23 @@ func (cs *claudeSession) handleResult(raw map[string]any) {
 		cs.usageMu.Unlock()
 	}
 
+	// A turn that failed (an API error, a model this CLI version refuses) still
+	// ends with a result line, marked is_error, whose text is the error. It has
+	// to reach the engine as an error so the card turns red instead of showing
+	// the error text as the answer.
+	if isError, _ := raw["is_error"].(bool); isError && !isCompaction {
+		msg := strings.TrimSpace(content)
+		if msg == "" {
+			msg = fmt.Sprintf("claude code turn failed (%s)", resultSubtype(raw))
+		}
+		slog.Warn("claudeSession: turn ended in error", "error", msg)
+		select {
+		case cs.events <- core.Event{Type: core.EventError, Error: fmt.Errorf("%s", msg), SessionID: cs.CurrentSessionID()}:
+		case <-cs.ctx.Done():
+		}
+		return
+	}
+
 	evt := core.Event{
 		Type:                     core.EventResult,
 		Content:                  content,

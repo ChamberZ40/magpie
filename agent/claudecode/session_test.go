@@ -823,3 +823,43 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(2)
 	}
 }
+
+// A turn that ends in an API error still ends with a result line, marked
+// is_error. Passing it on as an ordinary result made the card say the turn
+// succeeded with the error text as its answer.
+func TestHandleResultReportsAnErrorResultAsAnError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cs := &claudeSession{events: make(chan core.Event, 8), ctx: ctx}
+	cs.alive.Store(true)
+
+	cs.handleResult(map[string]any{
+		"type":     "result",
+		"subtype":  "success",
+		"is_error": true,
+		"result":   "API Error: 400 model not supported",
+	})
+
+	evt := <-cs.events
+	if evt.Type != core.EventError {
+		t.Fatalf("event type = %v, want EventError", evt.Type)
+	}
+	if evt.Error == nil || !strings.Contains(evt.Error.Error(), "model not supported") {
+		t.Errorf("error = %v, want the result text", evt.Error)
+	}
+}
+
+// An error result with no text still has to say something.
+func TestHandleResultErrorWithoutTextFallsBackToSubtype(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cs := &claudeSession{events: make(chan core.Event, 8), ctx: ctx}
+	cs.alive.Store(true)
+
+	cs.handleResult(map[string]any{"type": "result", "subtype": "error_during_execution", "is_error": true})
+
+	evt := <-cs.events
+	if evt.Type != core.EventError || evt.Error == nil || !strings.Contains(evt.Error.Error(), "error_during_execution") {
+		t.Errorf("event = %+v, want an EventError naming the subtype", evt)
+	}
+}
