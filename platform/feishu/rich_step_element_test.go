@@ -189,3 +189,21 @@ func TestRichStepBodyMatchesTheElementSplit(t *testing.T) {
 		}
 	}
 }
+
+// The panel title is a label for the rows under it, not a heading over the
+// answer, so it sits at the rows' size rather than above it.
+func TestBuildCollapsiblePanel_TitleIsAtNotationSize(t *testing.T) {
+	panel := buildCollapsiblePanel("🔧 Tools (1)", false, nil)
+
+	header, ok := panel["header"].(map[string]any)
+	if !ok {
+		t.Fatalf("panel = %#v, want a header", panel)
+	}
+	title, ok := header["title"].(map[string]any)
+	if !ok {
+		t.Fatalf("header = %#v, want a title", header)
+	}
+	if got := title["text_size"]; got != "notation" {
+		t.Errorf("title text_size = %v, want notation", got)
+	}
+}

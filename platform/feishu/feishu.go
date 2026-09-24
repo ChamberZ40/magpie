@@ -6620,7 +6620,7 @@ func buildCollapsiblePanel(title string, expanded bool, elements []map[string]an
 		"expanded":         expanded,
 		"background_color": "grey",
 		"header": map[string]any{
-			"title": map[string]any{"tag": "plain_text", "content": title},
+			"title": map[string]any{"tag": "plain_text", "content": title, "text_size": "notation"},
 		},
 		"border":           map[string]any{"color": "grey"},
 		"vertical_spacing": "8px",
