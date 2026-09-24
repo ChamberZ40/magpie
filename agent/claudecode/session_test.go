@@ -623,6 +623,47 @@ func makeFiller(n int) string {
 	return string(b)
 }
 
+// The tool_use block's id is the only handle the card has for pairing a later
+// tool_result with the call that started it: Claude Code's tool_result blocks
+// carry no tool name at all. Dropping the id here is what let one result
+// complete the wrong call and strand the others mid-run.
+func TestHandleAssistantEmitsToolUseID(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cs := &claudeSession{events: make(chan core.Event, 4), ctx: ctx}
+	cs.alive.Store(true)
+
+	cs.handleAssistant(map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{
+				map[string]any{
+					"type":  "tool_use",
+					"id":    "toolu_abc",
+					"name":  "Bash",
+					"input": map[string]any{"command": "ls"},
+				},
+			},
+		},
+	})
+
+	select {
+	case evt := <-cs.events:
+		if evt.Type != core.EventToolUse {
+			t.Fatalf("event type = %q, want %q", evt.Type, core.EventToolUse)
+		}
+		if evt.ToolUseID != "toolu_abc" {
+			t.Errorf("ToolUseID = %q, want %q", evt.ToolUseID, "toolu_abc")
+		}
+		if evt.ToolName != "Bash" {
+			t.Errorf("ToolName = %q, want %q", evt.ToolName, "Bash")
+		}
+	default:
+		t.Fatal("no event emitted for a tool_use block")
+	}
+}
+
 // TestHandleUserEmitsToolResult is a regression test for the bug where
 // claudeSession.handleUser silently dropped tool_result content blocks
 // (only logging when is_error=true) instead of emitting EventToolResult.
@@ -639,6 +680,7 @@ func TestHandleUserEmitsToolResult(t *testing.T) {
 		name        string
 		raw         map[string]any
 		wantResult  string
+		wantUseID   string
 		wantCode    int
 		wantSuccess bool
 	}{
@@ -658,6 +700,7 @@ func TestHandleUserEmitsToolResult(t *testing.T) {
 				},
 			},
 			wantResult:  "command output here",
+			wantUseID:   "toolu_abc",
 			wantCode:    0,
 			wantSuccess: true,
 		},
@@ -680,6 +723,7 @@ func TestHandleUserEmitsToolResult(t *testing.T) {
 				},
 			},
 			wantResult:  "line one\nline two",
+			wantUseID:   "toolu_def",
 			wantCode:    0,
 			wantSuccess: true,
 		},
@@ -699,6 +743,7 @@ func TestHandleUserEmitsToolResult(t *testing.T) {
 				},
 			},
 			wantResult:  "boom",
+			wantUseID:   "toolu_err",
 			wantCode:    1,
 			wantSuccess: false,
 		},
@@ -724,6 +769,9 @@ func TestHandleUserEmitsToolResult(t *testing.T) {
 				}
 				if evt.ToolResult != tc.wantResult {
 					t.Errorf("ToolResult = %q, want %q", evt.ToolResult, tc.wantResult)
+				}
+				if evt.ToolUseID != tc.wantUseID {
+					t.Errorf("ToolUseID = %q, want %q", evt.ToolUseID, tc.wantUseID)
 				}
 				if evt.ToolExitCode == nil || *evt.ToolExitCode != tc.wantCode {
 					got := -1

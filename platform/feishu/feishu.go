@@ -15,6 +15,7 @@ import (
 	"net/netip"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -6307,7 +6308,17 @@ func richStepDisplayName(step core.ToolStep) string {
 	return buildToolDisplay(step.Name, step.Summary).Title
 }
 
-func richStepBody(step core.ToolStep) string {
+// richStepBody renders one call as one line: what the tool did and what it did
+// it to, as produced by buildToolDisplay. A turn's calls share one panel, so a
+// row that spends a line on "status: ok | exit: 0" crowds out the next call for
+// no information — a successful call is the normal case.
+//
+// Only a failure earns a mark. A status the verdict logic cannot judge is
+// echoed verbatim rather than rounded to success.
+//
+// The raw output, the part that floods the card, hangs below the row and only
+// arrives when tool_detail = "full" left Result set.
+func richStepBody(step core.ToolStep, lang string) string {
 	name := richStepDisplayName(step)
 	summary := buildToolDisplay(step.Name, step.Summary).Detail
 	if summary == "" {
@@ -6317,28 +6328,51 @@ func richStepBody(step core.ToolStep) string {
 		return summary
 	}
 
-	lines := []string{summary}
-	var statusParts []string
-	status := strings.TrimSpace(step.Status)
-	if status != "" {
-		statusParts = append(statusParts, "status: "+status)
-	} else if step.Success != nil {
-		if *step.Success {
-			statusParts = append(statusParts, "status: ok")
-		} else {
-			statusParts = append(statusParts, "status: failed")
-		}
+	row := name
+	if summary != name {
+		row += "  " + summary
 	}
-	if step.ExitCode != nil {
-		statusParts = append(statusParts, fmt.Sprintf("exit: %d", *step.ExitCode))
-	}
-	if len(statusParts) > 0 {
-		lines = append(lines, strings.Join(statusParts, " | "))
+	if mark := richStepFailureMark(step, lang); mark != "" {
+		row += "  " + mark
 	}
 	if result := strings.TrimSpace(step.Result); result != "" {
-		lines = append(lines, result)
+		return row + "\n" + result
 	}
-	return strings.Join(lines, "\n")
+	return row
+}
+
+var (
+	richStepStatusFailed = []string{"failed", "failure", "error", "denied", "rejected"}
+	richStepStatusOK     = []string{"completed", "complete", "success", "succeeded", "ok", "done", "finished"}
+)
+
+// richStepFailureMark returns the trailing mark for a tool row, or "" when the
+// call succeeded or has not reported yet. Three signals decide it, most
+// explicit first: the success flag, then a status word the table recognizes,
+// then the exit code. A status none of them covers is returned as-is, because
+// calling an unknown outcome a success is the one answer that misleads.
+func richStepFailureMark(step core.ToolStep, lang string) string {
+	status := strings.ToLower(strings.TrimSpace(step.Status))
+	switch {
+	case step.Success != nil:
+		if *step.Success {
+			return ""
+		}
+	case slices.Contains(richStepStatusFailed, status):
+	case step.ExitCode != nil:
+		if *step.ExitCode == 0 {
+			return ""
+		}
+	case status == "" || slices.Contains(richStepStatusOK, status):
+		return ""
+	default:
+		return strings.TrimSpace(step.Status)
+	}
+	mark := "✗ " + core.Translate(core.MsgRichToolFailed, core.Language(lang))
+	if step.ExitCode != nil && *step.ExitCode != 0 {
+		return fmt.Sprintf("%s (exit %d)", mark, *step.ExitCode)
+	}
+	return mark
 }
 
 // isCardJSON returns true if content looks like a complete Feishu card JSON
@@ -6439,22 +6473,10 @@ func richStatusHeader(status core.CardStatus, lang string) (title, template stri
 	return "● " + core.Translate(core.MsgRichCardStatusWorking, core.Language(lang)), "blue"
 }
 
-func richStepRowContent(step core.ToolStep) string {
-	body := richStepBody(step)
-	if step.Kind == core.ToolStepKindThinking {
-		return body
-	}
-	name := richStepDisplayName(step)
-	if body == name || strings.HasPrefix(body, name+"\n") {
-		return body
-	}
-	return name + "\n" + body
-}
-
-func richStepElement(step core.ToolStep) map[string]any {
+func richStepElement(step core.ToolStep, lang string) map[string]any {
 	text := map[string]any{
 		"tag":       "plain_text",
-		"content":   richStepRowContent(step),
+		"content":   richStepBody(step, lang),
 		"text_size": "notation",
 	}
 	elem := map[string]any{
@@ -6496,7 +6518,7 @@ func richPanelElements(steps []core.ToolStep, lang string) []map[string]any {
 			fmt.Sprintf(core.Translate(core.MsgRichPanelHiddenSteps, core.Language(lang)), hidden)))
 	}
 	for _, step := range visible {
-		elements = append(elements, richStepElement(step))
+		elements = append(elements, richStepElement(step, lang))
 	}
 	return elements
 }
@@ -6574,7 +6596,7 @@ func buildRichCard(status core.CardStatus, lang string, steps []core.ToolStep, m
 
 	fallbackMarkdown := markdown
 	if strings.TrimSpace(fallbackMarkdown) == "" {
-		fallbackMarkdown = compactRichFallbackMarkdown(steps)
+		fallbackMarkdown = compactRichFallbackMarkdown(steps, lang)
 	}
 	slog.Debug("feishu: rich card exceeds size limit, fallback to compact markdown card", "size", len(b))
 	return buildCardJSONWithStatus(fallbackMarkdown, status, lang)
@@ -6748,14 +6770,14 @@ func compactRichText(s string, maxRunes int) string {
 	return string(rs[:maxRunes]) + "..."
 }
 
-func compactRichFallbackMarkdown(steps []core.ToolStep) string {
+func compactRichFallbackMarkdown(steps []core.ToolStep, lang string) string {
 	compactSteps := compactRichStepsForCardSize(steps, 3, 120)
 	if len(compactSteps) == 0 {
 		return ""
 	}
 	lines := []string{"Card content is large; showing recent activity:"}
 	for _, step := range compactSteps {
-		line := strings.TrimSpace(richStepRowContent(step))
+		line := strings.TrimSpace(richStepBody(step, lang))
 		if line == "" {
 			continue
 		}

@@ -65,10 +65,11 @@ func TestBuildRichCard_HeaderLocalization(t *testing.T) {
 	}
 }
 
+// Both lanes keep a grouped panel, so both count labels have to localize.
 func TestBuildRichCard_PanelTitleLocalization(t *testing.T) {
 	steps := []core.ToolStep{
 		{Kind: core.ToolStepKindThinking, Summary: "thinking out loud"},
-		{Kind: core.ToolStepKindTool, Name: "Bash", Summary: `{"command":"ls"}`},
+		{Kind: core.ToolStepKindTool, Name: "Bash", Summary: `{"command":"ls"}`, Status: "completed", Done: true},
 	}
 	for _, tc := range []struct {
 		lang      string

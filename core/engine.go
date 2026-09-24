@@ -5217,6 +5217,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				toolSteps = append(toolSteps, ToolStep{
 					Kind:    ToolStepKindTool,
 					Name:    event.ToolName,
+					UseID:   event.ToolUseID,
 					Summary: truncateIf(event.ToolInput, e.display.ToolMaxLen),
 				})
 				if cardMessageID == nil {
@@ -6252,28 +6253,30 @@ channelClosed:
 }
 
 // mergeRichToolResult folds a tool result into the step the card already shows
-// for that call, appending a step if the tool-use event never arrived.
+// for that call, appending a step only when the result names a tool the card
+// never saw start.
+//
+// Matching runs most-reliable-first: the agent's own call id, then the oldest
+// unfinished call with the same name, then the oldest unfinished call of any
+// name. Results come back in call order, so the *oldest* pending step is the
+// match — scanning backwards handed a result to the wrong call and left the
+// first one rendering "running" for the rest of the turn.
 //
 // detail decides how much of the result is kept. Below "full" the step is still
-// completed — Done is what keeps the panel row from looking stuck mid-run — but
-// the four fields the renderer turns into extra lines are left empty.
+// completed — Done is what keeps the panel row from looking stuck mid-run, and
+// the verdict fields are what the row renders — but the raw output, the part
+// that floods the card, is left behind.
 func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen int, detail string) []ToolStep {
 	toolName := strings.TrimSpace(event.ToolName)
-	if toolName == "" {
-		toolName = "Tool"
-	}
-
-	idx := -1
-	for i := len(steps) - 1; i >= 0; i-- {
-		if steps[i].Kind == ToolStepKindThinking {
-			continue
-		}
-		if strings.TrimSpace(steps[i].Name) == "" || strings.TrimSpace(steps[i].Name) == toolName {
-			idx = i
-			break
-		}
-	}
+	idx := matchRichToolStep(steps, strings.TrimSpace(event.ToolUseID), toolName)
 	if idx == -1 {
+		// A result with no name and nowhere to land describes a call the card
+		// cannot honestly draw. Dropping it costs one status line; inventing a
+		// step puts a row in the card for a call that never happened.
+		if toolName == "" {
+			slog.Debug("dropping unmatched tool result", "tool_use_id", event.ToolUseID, "status", event.ToolStatus)
+			return steps
+		}
 		summary := strings.TrimSpace(event.ToolInput)
 		if summary != "" {
 			summary = truncateIf(summary, maxLen)
@@ -6281,6 +6284,7 @@ func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen in
 		steps = append(steps, ToolStep{
 			Kind:    ToolStepKindTool,
 			Name:    toolName,
+			UseID:   strings.TrimSpace(event.ToolUseID),
 			Summary: summary,
 		})
 		idx = len(steps) - 1
@@ -6295,14 +6299,47 @@ func mergeRichToolResult(steps []ToolStep, event Event, result string, maxLen in
 	if strings.TrimSpace(steps[idx].Summary) == "" && strings.TrimSpace(event.ToolInput) != "" {
 		steps[idx].Summary = truncateIf(strings.TrimSpace(event.ToolInput), maxLen)
 	}
+	// Status, exit code and success are at most a short mark on the row, so they
+	// ride along at every detail level. The raw output is the part that floods
+	// the card, and that alone is what "full" buys.
+	steps[idx].Status = strings.TrimSpace(event.ToolStatus)
+	steps[idx].ExitCode = event.ToolExitCode
+	steps[idx].Success = event.ToolSuccess
 	if detail == ToolDetailFull {
 		steps[idx].Result = result
-		steps[idx].Status = strings.TrimSpace(event.ToolStatus)
-		steps[idx].ExitCode = event.ToolExitCode
-		steps[idx].Success = event.ToolSuccess
 	}
 	steps[idx].Done = true
 	return steps
+}
+
+// matchRichToolStep finds the step a tool result belongs to, or -1 when the
+// result has no call to pair with. Thinking rows are never candidates.
+func matchRichToolStep(steps []ToolStep, useID, toolName string) int {
+	if useID != "" {
+		for i := range steps {
+			if steps[i].Kind != ToolStepKindThinking && steps[i].UseID == useID {
+				return i
+			}
+		}
+	}
+	oldestPending := -1
+	for i := range steps {
+		if steps[i].Kind == ToolStepKindThinking || steps[i].Done {
+			continue
+		}
+		if toolName != "" && strings.TrimSpace(steps[i].Name) == toolName {
+			return i
+		}
+		if oldestPending == -1 {
+			oldestPending = i
+		}
+	}
+	// A nameless result still belongs to a call in flight; without a name the
+	// only thing left to go on is order.
+	if toolName == "" {
+		return oldestPending
+	}
+	return -1
 }
 
 // notifyDroppedQueuedMessages drains pendingMessages from the state and

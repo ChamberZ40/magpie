@@ -1113,7 +1113,7 @@ func TestBuildRichCard_UsesCodexRuntimeToolDescriptors(t *testing.T) {
 
 	panels := collectCardPanels(t, cardJSON)
 	if len(panels) != 1 {
-		t.Fatalf("panel count = %d, want 1 tools panel: %#v", len(panels), panels)
+		t.Fatalf("panel count = %d, want one grouped tools panel: %#v", len(panels), panels)
 	}
 	for _, want := range []string{
 		"Inspect files",
@@ -1135,7 +1135,7 @@ func TestBuildRichCard_UsesCodexRuntimeToolDescriptors(t *testing.T) {
 		"robot_outlined",
 	} {
 		if !panelContains(t, panels[0], want) {
-			t.Fatalf("tools panel should contain %q: %#v", want, panels[0])
+			t.Fatalf("tools panel does not contain %q: %#v", want, panels[0])
 		}
 	}
 }
@@ -1157,9 +1157,18 @@ func TestBuildRichCard_RendersThinkingAndToolResultRows(t *testing.T) {
 		},
 	}, "done", cardStreaming{enabled: true}, "")
 
-	for _, want := range []string{"Inspecting event routing", "echo hi", "completed", "exit: 0", "hi"} {
+	// A successful call renders as one clean line: the raw
+	// "status: completed | exit: 0" said nothing the absence of a failure mark
+	// does not already say, and it cost a line in a panel every other call has
+	// to share. A failure still prints — see TestRichStepBody_MarksFailures*.
+	for _, want := range []string{"Inspecting event routing", "echo hi", "hi"} {
 		if !strings.Contains(cardJSON, want) {
 			t.Fatalf("rich card should contain %q, got %q", want, cardJSON)
+		}
+	}
+	for _, unwanted := range []string{"status:", "exit:", "✗"} {
+		if strings.Contains(cardJSON, unwanted) {
+			t.Fatalf("rich card should not contain %q for a successful call, got %q", unwanted, cardJSON)
 		}
 	}
 	if strings.Contains(cardJSON, core.ProgressCardPayloadPrefix) {
@@ -1216,46 +1225,31 @@ func TestBuildRichCard_PanelsShowLatestTenSteps(t *testing.T) {
 	cardJSON := buildRichCard(core.CardStatusWorking, "", steps, "answer", cardStreaming{enabled: true}, "")
 
 	panels := collectCardPanels(t, cardJSON)
+	// One grouped panel per lane. Each panel keeps its ten most recent steps
+	// and collapses the older ones into a placeholder div.
 	if len(panels) != 2 {
-		t.Fatalf("panel count = %d, want reasoning and tools panels: %#v", len(panels), panels)
+		t.Fatalf("panel count = %d, want one reasoning and one tools panel: %#v", len(panels), panels)
 	}
-	for _, tt := range []struct {
-		name          string
-		panel         map[string]any
-		oldestHidden  string
-		windowStart   string
-		latestVisible string
-		resultVisible string
-		hiddenSummary string
-	}{
-		{
-			name:          "reasoning",
-			panel:         panels[0],
-			oldestHidden:  "reasoning-index-0",
-			windowStart:   "reasoning-index-5",
-			latestVisible: "reasoning-index-14",
-			hiddenSummary: "5 earlier steps hidden",
-		},
-		{
-			name:          "tools",
-			panel:         panels[1],
-			oldestHidden:  "tool-command-0",
-			windowStart:   "tool-command-5",
-			latestVisible: "tool-command-14",
-			resultVisible: "tool-result-14",
-			hiddenSummary: "5 earlier steps hidden",
-		},
-	} {
-		if panelContains(t, tt.panel, tt.oldestHidden) {
-			t.Fatalf("%s panel should hide oldest step %q: %#v", tt.name, tt.oldestHidden, tt.panel)
+
+	reasoning := panels[0]
+	if panelContains(t, reasoning, "reasoning-index-0") {
+		t.Fatalf("reasoning panel should hide its oldest step: %#v", reasoning)
+	}
+	for _, want := range []string{"reasoning-index-5", "reasoning-index-14", "5 earlier steps hidden"} {
+		if !panelContains(t, reasoning, want) {
+			t.Fatalf("reasoning panel should contain %q: %#v", want, reasoning)
 		}
-		for _, want := range []string{tt.windowStart, tt.latestVisible, tt.resultVisible, tt.hiddenSummary} {
-			if want == "" {
-				continue
-			}
-			if !panelContains(t, tt.panel, want) {
-				t.Fatalf("%s panel should contain %q: %#v", tt.name, want, tt.panel)
-			}
+	}
+
+	tools := panels[1]
+	for _, gone := range []string{"tool-command-0", "tool-command-4"} {
+		if panelContains(t, tools, gone) {
+			t.Fatalf("tools panel should drop the oldest call %q: %#v", gone, tools)
+		}
+	}
+	for _, want := range []string{"tool-command-5", "tool-command-14", "tool-result-14", "5 earlier steps hidden"} {
+		if !panelContains(t, tools, want) {
+			t.Fatalf("tools panel should contain %q: %#v", want, tools)
 		}
 	}
 }
@@ -1273,6 +1267,7 @@ func TestBuildRichCard_SeparatesReasoningAndTools(t *testing.T) {
 	if got := cardPanelTitle(panels[0]); got != "🧠 Reasoning (1)" {
 		t.Fatalf("first panel title = %q, want 🧠 Reasoning (1)", got)
 	}
+	// One grouped panel per lane, each titled with its own count.
 	if got := cardPanelTitle(panels[1]); got != "🔧 Tools (1)" {
 		t.Fatalf("second panel title = %q, want 🔧 Tools (1)", got)
 	}

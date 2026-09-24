@@ -392,6 +392,10 @@ const (
 	// Takes the hidden count.
 	MsgRichPanelHiddenSteps MsgKey = "rich_panel_hidden_steps"
 
+	// Per-call tool panel chrome: the verdict shown in the header next to the
+	// tool name and its duration, and the label above the raw output inside.
+	MsgRichToolFailed MsgKey = "rich_tool_failed"
+
 	// Rich-card footer context label, plus the remaining-budget suffix that is
 	// appended only once usage crosses richFooterCtxAlertPct.
 	MsgFooterContext         MsgKey = "footer_context"
@@ -2674,6 +2678,10 @@ var messages = map[MsgKey]map[Language]string{
 		LangEnglish: "... %d earlier steps hidden", LangChinese: "... 已隐藏 %d 个更早的步骤",
 		LangTraditionalChinese: "... 已隱藏 %d 個更早的步驟",
 		LangJapanese:           "... 以前のステップ %d 件を非表示", LangSpanish: "... %d pasos anteriores ocultos",
+	},
+	MsgRichToolFailed: {
+		LangEnglish: "Failed", LangChinese: "失败", LangTraditionalChinese: "失敗",
+		LangJapanese: "失敗", LangSpanish: "Error",
 	},
 	MsgCardTitleMode: {
 		LangEnglish: "Permission Mode", LangChinese: "权限模式", LangTraditionalChinese: "權限模式",

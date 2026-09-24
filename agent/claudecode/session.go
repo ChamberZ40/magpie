@@ -799,7 +799,8 @@ func (cs *claudeSession) handleAssistant(raw map[string]any) {
 				continue
 			}
 			inputSummary := summarizeInput(toolName, item["input"])
-			evt := core.Event{Type: core.EventToolUse, ToolName: toolName, ToolInput: inputSummary}
+			toolUseID, _ := item["id"].(string)
+			evt := core.Event{Type: core.EventToolUse, ToolName: toolName, ToolUseID: toolUseID, ToolInput: inputSummary}
 			select {
 			case cs.events <- evt:
 			case <-cs.ctx.Done():
@@ -886,8 +887,13 @@ func (cs *claudeSession) handleUser(raw map[string]any) {
 			if isError {
 				code = 1
 			}
+			// tool_result carries no tool name, only the id of the tool_use
+			// block that started the call. Without it the engine has nothing
+			// but arrival order to pair a result with its call.
+			toolUseID, _ := item["tool_use_id"].(string)
 			evt := core.Event{
 				Type:         core.EventToolResult,
+				ToolUseID:    toolUseID,
 				ToolResult:   truncateStr(strings.TrimSpace(result), 500),
 				ToolExitCode: &code,
 				ToolSuccess:  &success,

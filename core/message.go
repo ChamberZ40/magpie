@@ -436,6 +436,7 @@ type Event struct {
 	Type                     EventType
 	Content                  string
 	ToolName                 string         // populated for EventToolUse, EventPermissionRequest
+	ToolUseID                string         // agent's own call identifier: the tool_use block's id, echoed by tool_result as tool_use_id; pairs a result with the call that started it
 	ToolInput                string         // human-readable summary of tool input
 	ToolInputRaw             map[string]any // raw tool input (for EventPermissionRequest, used in allow response)
 	ToolResult               string         // populated for EventToolResult

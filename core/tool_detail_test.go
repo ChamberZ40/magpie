@@ -45,9 +45,10 @@ func TestMergeRichToolResultDetailLevels(t *testing.T) {
 		}
 	})
 
-	// Every one of these four fields renders as a visible extra line, so
-	// "summary" has to drop all of them, not just the raw output.
-	t.Run("summary drops the verbose fields but still completes the step", func(t *testing.T) {
+	// The raw output is the flood; the verdict fields are one glyph in the
+	// panel header, so they ride along at every level. See
+	// TestMergeRichToolResultKeepsTheVerdictAtSummaryButNotTheOutput.
+	t.Run("summary drops the raw output but still completes the step", func(t *testing.T) {
 		steps := mergeRichToolResult(nil, event, "all 42 tests passed", 500, ToolDetailSummary)
 		if len(steps) != 1 {
 			t.Fatalf("steps = %#v, want exactly one", steps)
@@ -55,15 +56,6 @@ func TestMergeRichToolResultDetailLevels(t *testing.T) {
 		s := steps[0]
 		if s.Result != "" {
 			t.Errorf("Result = %q, want it dropped", s.Result)
-		}
-		if s.Status != "" {
-			t.Errorf("Status = %q, want it dropped", s.Status)
-		}
-		if s.ExitCode != nil {
-			t.Errorf("ExitCode = %v, want nil", *s.ExitCode)
-		}
-		if s.Success != nil {
-			t.Errorf("Success = %v, want nil", *s.Success)
 		}
 		// The identifying half must survive, or the panel row says nothing.
 		if s.Name != "Bash" || s.Summary != "npm test" {
