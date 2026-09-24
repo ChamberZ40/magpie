@@ -188,7 +188,7 @@ func parseCodexSessionFile(path, filterCwd string) *core.AgentSessionInfo {
 	}
 
 	// Filter by cwd
-	if filterCwd != "" && sessionCwd != "" && sessionCwd != filterCwd {
+	if !cwdWithinWorkDir(sessionCwd, filterCwd) {
 		return nil
 	}
 
@@ -209,6 +209,31 @@ func parseCodexSessionFile(path, filterCwd string) *core.AgentSessionInfo {
 		MessageCount: msgCount,
 		ModifiedAt:   stat.ModTime(),
 	}
+}
+
+// cwdWithinWorkDir reports whether a rollout's recorded cwd belongs to the
+// project's work_dir tree, which is what /list scopes the session picker to.
+//
+// Containment rather than equality: Codex records the directory it was launched
+// from, so a session started in a repo checked out under work_dir has that repo
+// as its cwd. Demanding string equality hid every one of those — the sessions
+// most worth resuming — while still listing the ones started at the top level.
+//
+// Neither side missing is treated as a mismatch: an unset work_dir means the
+// project never scoped itself, and a rollout with no cwd cannot be placed at
+// all, so dropping it would hide a resumable session on no evidence.
+func cwdWithinWorkDir(sessionCwd, workDir string) bool {
+	if workDir == "" || sessionCwd == "" {
+		return true
+	}
+	rel, err := filepath.Rel(filepath.Clean(workDir), filepath.Clean(sessionCwd))
+	if err != nil {
+		return false
+	}
+	// filepath.Rel answers ".." for a sibling or a parent. Anything that has to
+	// climb out of work_dir to be reached is not inside it — including the
+	// "/code-old" case a string prefix test would wrongly accept.
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // isSubagentSessionSource reports whether Codex recorded the rollout as an
