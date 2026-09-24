@@ -551,8 +551,13 @@ type Engine struct {
 	platformLifecycleMu sync.Mutex
 	platformReady       map[Platform]bool
 	stopping            bool
-	replyFooterMu       sync.Mutex
-	replyFooterUsage    replyFooterUsageCache
+	// turns tracks every turn goroutine so Stop can let them finish saving
+	// the session. Adds happen under platformLifecycleMu and are refused
+	// once stopping is set, so none can race Stop's Wait.
+	turns            sync.WaitGroup
+	turnStopGrace    time.Duration
+	replyFooterMu    sync.Mutex
+	replyFooterUsage replyFooterUsageCache
 
 	// pendingRestartNotify is queued at startup if a /restart was consumed
 	// from the run/restart_notify file. It is dispatched on the first
@@ -833,6 +838,7 @@ func NewEngine(name string, ag Agent, platforms []Platform, sessionStorePath str
 		interactiveStates:     make(map[string]*interactiveState),
 		sendWorkDirs:          make(map[string]string),
 		platformReady:         make(map[Platform]bool),
+		turnStopGrace:         defaultTurnStopGrace,
 		startedAt:             time.Now(),
 		streamPreview:         DefaultStreamPreviewCfg(),
 		references:            DefaultReferenceRenderCfg(),
@@ -2491,10 +2497,63 @@ func (e *Engine) Stop() error {
 	if err := e.agent.Stop(); err != nil {
 		errs = append(errs, fmt.Errorf("stop agent %s: %w", e.agent.Name(), err))
 	}
+	// Last, once the agent sessions are closed and the turns have something
+	// to unwind against: a turn saves the session as it finishes, and a
+	// restart that exits before that save lands comes back without it.
+	if !e.waitForTurns(e.turnStopGrace) {
+		slog.Warn("engine.Stop: turns still running after grace period; exiting anyway",
+			"project", e.name, "grace", e.turnStopGrace)
+	}
 	if len(errs) > 0 {
 		return fmt.Errorf("engine stop errors: %v", errs)
 	}
 	return nil
+}
+
+// startTurn launches a turn on a tracked goroutine. The caller has already
+// locked the session and the turn releases it; if the engine is stopping and
+// the turn is refused, that release happens here instead.
+func (e *Engine) startTurn(p Platform, msg *Message, session *Session, agent Agent, sessions *SessionManager, interactiveKey, workspaceDir string) {
+	if !e.goTurn(func() {
+		e.processInteractiveMessageWith(p, msg, session, agent, sessions, interactiveKey, workspaceDir, msg.SessionKey)
+	}) {
+		session.Unlock()
+	}
+}
+
+// defaultTurnStopGrace bounds how long Stop waits for turns to finish. A turn
+// wedged on something that never answers must not turn a restart into a hang.
+const defaultTurnStopGrace = 5 * time.Second
+
+// goTurn runs a turn on its own goroutine, tracked so Stop can wait for it.
+// It refuses, and reports false, once Stop has begun: the agent sessions the
+// turn would talk to are being closed.
+func (e *Engine) goTurn(run func()) bool {
+	e.platformLifecycleMu.Lock()
+	defer e.platformLifecycleMu.Unlock()
+	if e.stopping {
+		return false
+	}
+	e.turns.Add(1)
+	go func() {
+		defer e.turns.Done()
+		run()
+	}()
+	return true
+}
+
+func (e *Engine) waitForTurns(grace time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		e.turns.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-time.After(grace):
+		return false
+	}
 }
 
 // OnPlatformReady marks an async platform as ready and initializes platform-level
@@ -3182,7 +3241,7 @@ sessionLocked:
 		"session", session.ID,
 	)
 
-	go e.processInteractiveMessageWith(p, msg, session, agent, sessions, interactiveKey, resolvedWorkspace, msg.SessionKey)
+	e.startTurn(p, msg, session, agent, sessions, interactiveKey, resolvedWorkspace)
 }
 
 func runMessageAccepted(msg *Message) {
@@ -4642,7 +4701,14 @@ func (e *Engine) startUnsolicitedReader(state *interactiveState, session *Sessio
 	state.unsolicitedDone = done
 	state.mu.Unlock()
 
-	go e.runUnsolicitedReader(ctx, cancel, done, state, agentSession, session, sessions, sessionKey, workspaceDir)
+	// Counted as a turn: it saves the session when a background turn ends,
+	// and Stop must not return while that save is in flight.
+	if !e.goTurn(func() {
+		e.runUnsolicitedReader(ctx, cancel, done, state, agentSession, session, sessions, sessionKey, workspaceDir)
+	}) {
+		cancel()
+		close(done)
+	}
 }
 
 // runUnsolicitedReader is the goroutine body for the unsolicited event reader.
@@ -14792,7 +14858,7 @@ func (e *Engine) executeCustomCommand(p Platform, msg *Message, cmd *CustomComma
 	)
 
 	msg.Content = prompt
-	go e.processInteractiveMessageWith(p, msg, session, agent, sessions, interactiveKey, workspaceDir, msg.SessionKey)
+	e.startTurn(p, msg, session, agent, sessions, interactiveKey, workspaceDir)
 }
 
 // executeShellCommand runs a shell command and sends the output to the user.
@@ -15020,7 +15086,7 @@ func (e *Engine) executeSkill(p Platform, msg *Message, skill *Skill, args []str
 	)
 
 	msg.Content = prompt
-	go e.processInteractiveMessageWith(p, msg, session, agent, sessions, interactiveKey, workspaceDir, msg.SessionKey)
+	e.startTurn(p, msg, session, agent, sessions, interactiveKey, workspaceDir)
 }
 
 func (e *Engine) cmdSkills(p Platform, msg *Message) {
