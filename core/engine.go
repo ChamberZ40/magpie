@@ -4924,10 +4924,30 @@ func (e *Engine) runUnsolicitedReader(ctx context.Context, cancel context.Cancel
 type agentErrorHandler struct {
 	contains string
 	msgKey   MsgKey
+	// keepError appends the agent's own error text under the message, for
+	// errors whose specifics (a version, a command) only the agent knows.
+	keepError bool
 }
 
 var agentErrorHandlers = []agentErrorHandler{
-	{"Session not found", MsgSessionNotFound},
+	{contains: "Session not found", msgKey: MsgSessionNotFound},
+	{contains: "or newer is required", msgKey: MsgAgentUpgradeRequired, keepError: true},
+}
+
+// agentErrorMessage turns an agent error into the reply the user sees: a
+// dedicated message when one of agentErrorHandlers recognises it, else the
+// generic error line.
+func agentErrorMessage(i18n *I18n, errMsg string) string {
+	for _, h := range agentErrorHandlers {
+		if !strings.Contains(errMsg, h.contains) {
+			continue
+		}
+		if h.keepError {
+			return i18n.T(h.msgKey) + "\n\n" + errMsg
+		}
+		return i18n.T(h.msgKey)
+	}
+	return fmt.Sprintf(i18n.T(MsgError), errMsg)
 }
 
 func (e *Engine) processInteractiveEvents(state *interactiveState, session *Session, sessions *SessionManager, sessionKey string, msgID string, turnStart time.Time, stopTypingFn func(), sendDone <-chan error, replyCtx any) {
@@ -6244,14 +6264,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					Platform:   p.Name(),
 					Error:      event.Error.Error(),
 				})
-				userMsg := fmt.Sprintf(e.i18n.T(MsgError), errMsg)
-				for _, h := range agentErrorHandlers {
-					if strings.Contains(errMsg, h.contains) {
-						userMsg = e.i18n.T(h.msgKey)
-						break
-					}
-				}
-				e.send(p, replyCtx, userMsg)
+				e.send(p, replyCtx, agentErrorMessage(e.i18n, errMsg))
 			}
 			// Only drop queued messages if the agent session is dead.
 			// Some agents (e.g. Codex) emit EventError for per-turn failures

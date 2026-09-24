@@ -182,6 +182,7 @@ const (
 	MsgToolAllowedNew            MsgKey = "tool_allowed_new"
 	MsgError                     MsgKey = "error"
 	MsgSessionNotFound           MsgKey = "session_not_found"
+	MsgAgentUpgradeRequired      MsgKey = "agent_upgrade_required"
 	MsgFailedToStartAgentSession MsgKey = "failed_to_start_agent_session"
 	MsgFailedToDeleteSession     MsgKey = "failed_to_delete_session"
 	MsgEmptyResponse             MsgKey = "empty_response"
@@ -854,6 +855,13 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "⚠️ 後台任務請求使用工具 `%s` 的權限，但已自動拒絕（目前無活躍會話）。請發送訊息或使用 `/yolo` 授權後續請求。",
 		LangJapanese:           "⚠️ バックグラウンドタスクがツール `%s` の権限を要求しましたが、自動的に拒否されました（アクティブなユーザーターンなし）。メッセージを送信するか `/yolo` を使用して今後のリクエストを承認してください。",
 		LangSpanish:            "⚠️ Una tarea en segundo plano solicitó permiso para `%s` pero se denegó automáticamente (sin turno de usuario activo). Envía un mensaje o usa `/yolo` para aprobar solicitudes futuras.",
+	},
+	MsgAgentUpgradeRequired: {
+		LangEnglish:            "⚠️ The agent CLI on this machine is too old for the selected model. Please upgrade it, then send /new to start a session on the new version (or switch models with /model).",
+		LangChinese:            "⚠️ 本机的 agent CLI 版本太旧，不支持当前模型。请先升级 CLI，然后发送 /new 在新版本上开始会话（或用 /model 换一个模型）。",
+		LangTraditionalChinese: "⚠️ 本機的 agent CLI 版本太舊，不支援目前模型。請先升級 CLI，然後發送 /new 在新版本上開始會話（或用 /model 換一個模型）。",
+		LangJapanese:           "⚠️ このマシンの agent CLI は古すぎて、選択中のモデルに対応していません。CLI をアップグレードしてから /new で新しいセッションを開始してください（または /model でモデルを切り替えてください）。",
+		LangSpanish:            "⚠️ La CLI del agente en esta máquina es demasiado antigua para el modelo seleccionado. Actualízala y luego envía /new para iniciar una sesión con la nueva versión (o cambia de modelo con /model).",
 	},
 	MsgSessionNotFound: {
 		LangEnglish:            "⚠️ Session expired. Use /new to start a fresh conversation.",
