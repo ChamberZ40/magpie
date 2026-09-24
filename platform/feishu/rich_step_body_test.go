@@ -206,3 +206,21 @@ func TestRichStepBody_KeepsOutputForToolsNotOptedOut(t *testing.T) {
 		t.Errorf("body = %q, want the output kept", got)
 	}
 }
+
+// A command arrives as plain text, not JSON, and the text is the target. The
+// summary extractor is built for prose like `Read "main.go"`, where the quoted
+// part is the point; applied to a command it plucked out whatever happened to
+// be quoted first, so `...; echo "---"; ...` rendered as a row reading "---".
+func TestRichStepBody_ShowsTheWholeCommandNotItsFirstQuotedString(t *testing.T) {
+	for _, command := range []string{
+		`openclaw config get agents.defaults.model --json 2>&1 | head -20; echo "---"; openclaw models status --plain`,
+		`git commit -m 'fix: thing'`,
+		"echo `date` > stamp.txt",
+	} {
+		step := core.ToolStep{Kind: core.ToolStepKindTool, Name: "Bash", Summary: command, Done: true}
+
+		if got := splitRichStep(step, "en").Detail; got != command {
+			t.Errorf("detail = %q, want the command %q", got, command)
+		}
+	}
+}

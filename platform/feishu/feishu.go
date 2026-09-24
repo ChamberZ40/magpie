@@ -5678,6 +5678,12 @@ func extractToolDetailFromSummary(text string, desc toolDescriptor) string {
 				return strings.TrimSpace(match[1])
 			}
 		}
+		// A command is its own target. Plucking out a quoted string or a code
+		// span is right for prose like `Read "main.go"` and wrong here: it
+		// turned `...; echo "---"; ...` into a row that read "---".
+		if desc.Sanitizer == toolSanitizerCommand {
+			return line
+		}
 		if code := extractFirstCodeSpan(line); code != "" {
 			return code
 		}
