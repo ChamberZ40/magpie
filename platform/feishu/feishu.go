@@ -6697,17 +6697,18 @@ func buildRichCardJSONBytes(status core.CardStatus, lang string, steps []core.To
 			richPanelElements(reasoningSteps, lang),
 		))
 	}
-	if len(toolSteps) > 0 {
-		panelMaps = append(panelMaps, buildCollapsiblePanel(
-			richPanelLabel(core.MsgRichPanelTools, len(toolSteps), lang),
-			streaming.enabled,
-			richPanelElements(toolSteps, lang),
-		))
+	// The Tools panel always renders: "no tools ran" is itself worth seeing at
+	// a glance. Reasoning stays hidden when empty — it has nothing to report.
+	toolElements := richPanelElements(toolSteps, lang)
+	if len(toolSteps) == 0 {
+		toolElements = []map[string]any{richPlaceholderElement(
+			core.Translate(core.MsgRichPanelNoTools, core.Language(lang)))}
 	}
-	// No panel when there is nothing to put in one. A turn that answers without
-	// calling a tool used to get an empty Reasoning panel holding a placeholder,
-	// which claimed a section of the card to say nothing — the status header
-	// already reports that the turn is running.
+	panelMaps = append(panelMaps, buildCollapsiblePanel(
+		richPanelLabel(core.MsgRichPanelTools, len(toolSteps), lang),
+		streaming.enabled,
+		toolElements,
+	))
 
 	markdownMap := map[string]any{
 		"tag":        "markdown",

@@ -392,6 +392,7 @@ const (
 	// Stands in for the steps trimmed off the top of an over-long panel.
 	// Takes the hidden count.
 	MsgRichPanelHiddenSteps MsgKey = "rich_panel_hidden_steps"
+	MsgRichPanelNoTools     MsgKey = "rich_panel_no_tools"
 
 	// Per-call tool panel chrome: the verdict shown in the header next to the
 	// tool name and its duration, and the label above the raw output inside.
@@ -2680,6 +2681,11 @@ var messages = map[MsgKey]map[Language]string{
 		LangEnglish: "... %d earlier steps hidden", LangChinese: "... 已隐藏 %d 个更早的步骤",
 		LangTraditionalChinese: "... 已隱藏 %d 個更早的步驟",
 		LangJapanese:           "... 以前のステップ %d 件を非表示", LangSpanish: "... %d pasos anteriores ocultos",
+	},
+	MsgRichPanelNoTools: {
+		LangEnglish: "No tools called", LangChinese: "本轮未调用工具",
+		LangTraditionalChinese: "本輪未呼叫工具",
+		LangJapanese:           "ツールの呼び出しなし", LangSpanish: "No se llamó a ninguna herramienta",
 	},
 	MsgRichToolFailed: {
 		LangEnglish: "Failed", LangChinese: "失败", LangTraditionalChinese: "失敗",

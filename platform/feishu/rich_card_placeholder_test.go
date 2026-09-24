@@ -1,6 +1,7 @@
 package feishu
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -8,23 +9,41 @@ import (
 )
 
 // A turn with no tool calls and no thinking events used to synthesize an empty
-// Reasoning panel carrying a hardcoded English "Thinking..." placeholder. It
-// claimed a section of the card to say nothing, and said it in the wrong
-// language. The status header already reports that the turn is running.
+// Reasoning panel carrying a hardcoded English "Thinking..." placeholder, and
+// later got no panel at all. Neither told a reader what they wanted to know at
+// a glance: that the turn ran no tools. The Tools panel now always renders,
+// and with nothing in it says so in the reader's language.
 
-func TestBuildRichCard_NoPanelWhenThereAreNoSteps(t *testing.T) {
+func TestBuildRichCard_ToolsPanelShowsWhenNoToolRan(t *testing.T) {
 	for _, streaming := range []cardStreaming{{enabled: true}, {}} {
 		cardJSON := buildRichCard(core.CardStatusThinking, "zh", nil, "答案是 42", streaming, "")
-		if panels := collectCardPanels(t, cardJSON); len(panels) != 0 {
-			t.Errorf("streaming=%v: panel count = %d, want 0 — an empty panel says nothing: %#v",
+		panels := collectCardPanels(t, cardJSON)
+		if len(panels) != 1 {
+			t.Fatalf("streaming=%v: panel count = %d, want only the Tools panel: %#v",
 				streaming.enabled, len(panels), panels)
+		}
+		panel, _ := json.Marshal(panels[0])
+		for _, want := range []string{"🔧 工具", "本轮未调用工具"} {
+			if !strings.Contains(string(panel), want) {
+				t.Errorf("streaming=%v: tools panel = %s, want it to contain %q", streaming.enabled, panel, want)
+			}
 		}
 		if strings.Contains(cardJSON, "Thinking...") {
 			t.Errorf("streaming=%v: card still carries the hardcoded placeholder: %s", streaming.enabled, cardJSON)
 		}
-		// The body must survive the panel removal.
 		if !strings.Contains(cardJSON, "42") {
 			t.Errorf("streaming=%v: card lost its body: %s", streaming.enabled, cardJSON)
+		}
+	}
+}
+
+func TestBuildRichCard_NoToolsPlaceholderIsLocalized(t *testing.T) {
+	for lang, want := range map[string]string{
+		"en": "No tools called", "zh": "本轮未调用工具", "zh-TW": "本輪未呼叫工具",
+		"ja": "ツールの呼び出しなし", "es": "No se llamó a ninguna herramienta",
+	} {
+		if cardJSON := buildRichCard(core.CardStatusDone, lang, nil, "ok", cardStreaming{}, ""); !strings.Contains(cardJSON, want) {
+			t.Errorf("lang=%q: card should contain %q: %s", lang, want, cardJSON)
 		}
 	}
 }
