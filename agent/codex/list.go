@@ -219,7 +219,7 @@ func parseCodexSessionFile(path, filterCwd string) *core.AgentSessionInfo {
 // as its cwd. Demanding string equality hid every one of those — the sessions
 // most worth resuming — while still listing the ones started at the top level.
 //
-// Neither side missing is treated as a mismatch: an unset work_dir means the
+// A missing side on either end keeps the session: an unset work_dir means the
 // project never scoped itself, and a rollout with no cwd cannot be placed at
 // all, so dropping it would hide a resumable session on no evidence.
 func cwdWithinWorkDir(sessionCwd, workDir string) bool {
