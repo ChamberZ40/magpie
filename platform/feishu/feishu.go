@@ -6308,6 +6308,42 @@ func richStepDisplayName(step core.ToolStep) string {
 	return buildToolDisplay(step.Name, step.Summary).Title
 }
 
+// richStepParts is one call taken apart into the pieces a row can say: what
+// ran, what it ran on, how it turned out, and what came back.
+//
+// Two renderers consume it. The card gives each piece its own element, which is
+// the only way to indent and grey the target and the output — a Feishu text
+// node has one size and one color, so a single concatenated string cannot say
+// "this half matters less". The card-too-big fallback flattens the same pieces
+// back into one line. Both read this function so they cannot drift.
+type richStepParts struct {
+	Title  string // the action, e.g. "Run tests"
+	Detail string // the target — empty when it would only repeat the title
+	Mark   string // the failure mark, or "" for a clean or still-running call
+	Output string // the raw output — empty unless this row keeps it
+}
+
+func splitRichStep(step core.ToolStep, lang string) richStepParts {
+	name := richStepDisplayName(step)
+	detail := buildToolDisplay(step.Name, step.Summary).Detail
+	if detail == "" {
+		detail = name
+	}
+	if step.Kind == core.ToolStepKindThinking {
+		// A thought has no target, no verdict and no output — just the text.
+		return richStepParts{Title: detail}
+	}
+
+	parts := richStepParts{Title: name, Mark: richStepFailureMark(step, lang)}
+	if detail != name {
+		parts.Detail = detail
+	}
+	if result := strings.TrimSpace(step.Result); result != "" && !richStepSkipsResult(step, parts.Mark) {
+		parts.Output = result
+	}
+	return parts
+}
+
 // richStepBody renders one call as one line: what the tool did and what it did
 // it to, as produced by buildToolDisplay. A turn's calls share one panel, so a
 // row that spends a line on "status: ok | exit: 0" crowds out the next call for
@@ -6317,27 +6353,22 @@ func richStepDisplayName(step core.ToolStep) string {
 // echoed verbatim rather than rounded to success.
 //
 // The raw output, the part that floods the card, hangs below the row and only
-// arrives when tool_detail = "full" left Result set.
+// arrives when the detail level and the tool both agreed to keep it.
+//
+// This flat form is what the card-too-big fallback prints. The card itself
+// renders the same pieces as separate elements; see richStepElements.
 func richStepBody(step core.ToolStep, lang string) string {
-	name := richStepDisplayName(step)
-	summary := buildToolDisplay(step.Name, step.Summary).Detail
-	if summary == "" {
-		summary = name
-	}
-	if step.Kind == core.ToolStepKindThinking {
-		return summary
-	}
+	parts := splitRichStep(step, lang)
 
-	row := name
-	if summary != name {
-		row += "  " + summary
+	row := parts.Title
+	if parts.Detail != "" {
+		row += "  " + parts.Detail
 	}
-	mark := richStepFailureMark(step, lang)
-	if mark != "" {
-		row += "  " + mark
+	if parts.Mark != "" {
+		row += "  " + parts.Mark
 	}
-	if result := strings.TrimSpace(step.Result); result != "" && !richStepSkipsResult(step, mark) {
-		return row + "\n" + result
+	if parts.Output != "" {
+		row += "\n" + parts.Output
 	}
 	return row
 }
@@ -6474,22 +6505,66 @@ func richStatusHeader(status core.CardStatus, lang string) (title, template stri
 	return "● " + core.Translate(core.MsgRichCardStatusWorking, core.Language(lang)), "blue"
 }
 
-func richStepElement(step core.ToolStep, lang string) map[string]any {
+// richStepDetailMargin indents a step's target and output to clear the title
+// row's icon, so they read as belonging to the call above rather than as calls
+// of their own.
+const richStepDetailMargin = "0px 0px 0px 22px"
+
+// richStepElements renders one call as one to three card elements: the title
+// row carrying the glyph and the verdict, then the target and the raw output
+// indented under it in grey.
+//
+// It used to be a single element holding a single string, which meant the
+// target and the whole raw output rendered at exactly the weight of the action
+// that produced them. A text node has one color and one size, so the only way
+// to de-emphasize the lower two is to make them their own nodes.
+//
+// Only the title keeps the icon: repeating the glyph would read as a second
+// call rather than a continuation of this one.
+func richStepElements(step core.ToolStep, lang string) []map[string]any {
+	parts := splitRichStep(step, lang)
+
+	if step.Kind == core.ToolStepKindThinking {
+		elem := richStepTextElement(parts.Title, true, false)
+		elem["icon"] = map[string]any{"tag": "standard_icon", "token": reasoningToolIcon}
+		return []map[string]any{elem}
+	}
+
+	title := parts.Title
+	if parts.Mark != "" {
+		title += "  " + parts.Mark
+	}
+	head := richStepTextElement(title, false, false)
+	head["icon"] = map[string]any{"tag": "standard_icon", "token": buildToolDisplay(step.Name, step.Summary).IconToken}
+
+	elements := []map[string]any{head}
+	for _, sub := range []string{parts.Detail, parts.Output} {
+		if sub != "" {
+			elements = append(elements, richStepTextElement(sub, true, true))
+		}
+	}
+	return elements
+}
+
+// richStepTextElement builds one row of a step. indent is what puts a row under
+// the title instead of beside it; the 22px matches the width the icon occupies,
+// so the text lines up with the title above it rather than with the glyph.
+func richStepTextElement(content string, grey, indent bool) map[string]any {
 	text := map[string]any{
 		"tag":       "plain_text",
-		"content":   richStepBody(step, lang),
+		"content":   content,
 		"text_size": "notation",
+	}
+	if grey {
+		text["text_color"] = "grey"
 	}
 	elem := map[string]any{
 		"tag":  "div",
 		"text": text,
 	}
-	if step.Kind == core.ToolStepKindThinking {
-		text["text_color"] = "grey"
-		elem["icon"] = map[string]any{"tag": "standard_icon", "token": reasoningToolIcon}
-		return elem
+	if indent {
+		elem["margin"] = richStepDetailMargin
 	}
-	elem["icon"] = map[string]any{"tag": "standard_icon", "token": buildToolDisplay(step.Name, step.Summary).IconToken}
 	return elem
 }
 
@@ -6513,13 +6588,16 @@ func richPanelElements(steps []core.ToolStep, lang string) []map[string]any {
 		hidden = len(steps) - maxPanelSteps
 		visible = steps[hidden:]
 	}
+	// The cap counts calls, not elements: a split row must not cost a reader
+	// two of their ten. The capacity here is only a hint — a row contributes
+	// up to three elements and append grows past it.
 	elements := make([]map[string]any, 0, len(visible)+1)
 	if hidden > 0 {
 		elements = append(elements, richPlaceholderElement(
 			fmt.Sprintf(core.Translate(core.MsgRichPanelHiddenSteps, core.Language(lang)), hidden)))
 	}
 	for _, step := range visible {
-		elements = append(elements, richStepElement(step, lang))
+		elements = append(elements, richStepElements(step, lang)...)
 	}
 	return elements
 }
