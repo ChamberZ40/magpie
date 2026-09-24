@@ -381,12 +381,28 @@ func (a *Agent) AvailableModels(ctx context.Context) []core.ModelOption {
 	if models := a.fetchModelsFromAPI(ctx); len(models) > 0 {
 		return models
 	}
+	return claudeCodeFallbackModels()
+}
+
+// claudeCodeFallbackModels is the last resort for the /model chooser, reached
+// when no live source answers: no [[providers]] in config and no API key for
+// the /v1/models call. Subscription logins hit both, so for most operators this
+// list *is* the chooser.
+//
+// Aliases come first deliberately: the CLI resolves opus / sonnet / haiku to
+// the current generation itself, so they cannot go stale the way a pinned id
+// does. The pinned ids follow for operators who need a fixed model. Both sets
+// were read out of claude 2.1.278 rather than written from memory.
+func claudeCodeFallbackModels() []core.ModelOption {
 	return []core.ModelOption{
-		{Name: "sonnet", Desc: "Claude Sonnet (balanced)"},
-		{Name: "sonnet[1m]", Desc: "Claude Sonnet (1M context)"},
 		{Name: "opus", Desc: "Claude Opus (most capable)"},
-		{Name: "opus[1m]", Desc: "Claude Opus (1M context)"},
+		{Name: "sonnet", Desc: "Claude Sonnet (balanced)"},
 		{Name: "haiku", Desc: "Claude Haiku (fastest)"},
+		{Name: "opus[1m]", Desc: "Claude Opus (1M context)"},
+		{Name: "sonnet[1m]", Desc: "Claude Sonnet (1M context)"},
+		{Name: "claude-opus-5", Desc: "Claude Opus 5 (pinned)"},
+		{Name: "claude-sonnet-5", Desc: "Claude Sonnet 5 (pinned)"},
+		{Name: "claude-fable-5-1", Desc: "Claude Fable 5.1 (pinned)"},
 	}
 }
 

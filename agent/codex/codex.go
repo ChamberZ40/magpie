@@ -74,6 +74,10 @@ func New(opts map[string]any) (core.Agent, error) {
 		return nil, fmt.Errorf("codex: %q CLI not found in PATH, install with: npm install -g @openai/codex", cmd)
 	}
 
+	if codexModelLooksForeign(model) {
+		slog.Warn(codexForeignModelWarning, "model", model)
+	}
+
 	// Parse project-level env from opts["env"] (set via [projects.agent.options.env] in config.toml).
 	// Stored separately from runtime sessionEnv so SetSessionEnv calls cannot overwrite it.
 	// MergeEnv semantics ensure these override any same-named keys inherited from os.Environ()
@@ -222,14 +226,47 @@ func (a *Agent) AvailableModels(ctx context.Context) []core.ModelOption {
 	if models := readCodexCachedModels(); len(models) > 0 {
 		return models
 	}
+	return codexFallbackModels()
+}
+
+// codexFallbackModels is the last resort for the /model chooser, reached when
+// no live source answers: no [[providers]] in config, no model_catalog.json or
+// models_cache.json under CODEX_HOME, and no API key for the /v1/models call.
+// Subscription logins hit all three, so for most operators this list *is* the
+// chooser — which is why letting it go stale is worse than it looks.
+//
+// Read out of codex-cli 0.155.1 rather than written from memory. Every entry
+// must satisfy isCodexChatModel, or the chooser offers a model the very next
+// code path filters out.
+func codexFallbackModels() []core.ModelOption {
 	return []core.ModelOption{
-		{Name: "o4-mini", Desc: "O4 Mini (fast reasoning)"},
-		{Name: "o3", Desc: "O3 (most capable reasoning)"},
-		{Name: "gpt-4.1", Desc: "GPT-4.1 (balanced)"},
-		{Name: "gpt-4.1-mini", Desc: "GPT-4.1 Mini (fast)"},
-		{Name: "gpt-4.1-nano", Desc: "GPT-4.1 Nano (fastest)"},
-		{Name: "codex-mini-latest", Desc: "Codex Mini (code-optimized)"},
+		{Name: "gpt-5.6-sol", Desc: "GPT-5.6 Sol (default)"},
+		{Name: "gpt-5.6-luna", Desc: "GPT-5.6 Luna"},
+		{Name: "gpt-5.6-terra", Desc: "GPT-5.6 Terra"},
+		{Name: "gpt-5.5", Desc: "GPT-5.5"},
+		{Name: "gpt-5.3-codex", Desc: "GPT-5.3 Codex (code-optimized)"},
+		{Name: "gpt-5.1-codex-max", Desc: "GPT-5.1 Codex Max"},
 	}
+}
+
+// codexForeignModelWarning is logged once at startup when the configured model
+// does not look like one Codex CLI drives. It names the custom-provider escape
+// hatch because New() genuinely cannot rule that case out — see
+// codexModelLooksForeign.
+const codexForeignModelWarning = "codex: configured model is not an OpenAI/Codex family id; " +
+	"ignore this if you reach it through a custom [model_providers.*] entry"
+
+// codexModelLooksForeign reports whether a configured model sits outside the
+// families Codex CLI drives — the state switch-agent.sh used to leave behind
+// when it changed the agent type but left `model` pointing at the other CLI's.
+//
+// This only ever warrants a warning, never a refusal: a custom
+// [model_providers.*] entry may legitimately name anything, and New() cannot
+// see providers because they arrive later through SetProviders. An empty model
+// is not a misconfiguration either — codex then picks its own default.
+func codexModelLooksForeign(model string) bool {
+	model = strings.TrimSpace(model)
+	return model != "" && !isCodexChatModel(model)
 }
 
 // nonChatSubstrings identifies non chat/completion modalities returned by
