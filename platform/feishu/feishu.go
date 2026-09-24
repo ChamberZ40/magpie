@@ -5248,11 +5248,16 @@ const (
 )
 
 type toolDescriptor struct {
-	Aliases         []string
-	IconToken       string
-	Title           string
-	Sanitizer       toolSanitizer
-	ParamKeys       []string
+	Aliases   []string
+	IconToken string
+	Title     string
+	Sanitizer toolSanitizer
+	ParamKeys []string
+	// SkipResult marks a tool whose successful output is the flood itself — a
+	// Read returns the whole file, a fetch the whole page — for a row that
+	// already names the path or the URL. A failure still shows its output:
+	// that one is the only thing on the row worth reading.
+	SkipResult      bool
 	SummaryPatterns []*regexp.Regexp
 }
 
@@ -5276,6 +5281,7 @@ var toolDescriptors = []toolDescriptor{
 		IconToken:       "file-link-text_outlined",
 		Title:           "Read",
 		Sanitizer:       toolSanitizerPath,
+		SkipResult:      true,
 		ParamKeys:       []string{"file_path", "path", "file"},
 		SummaryPatterns: []*regexp.Regexp{regexp.MustCompile(`(?i)^(?:read|open)\s+(?:file\s+)?(.+)$`)},
 	},
@@ -5284,6 +5290,7 @@ var toolDescriptors = []toolDescriptor{
 		IconToken:       "edit_outlined",
 		Title:           "Edit",
 		Sanitizer:       toolSanitizerPath,
+		SkipResult:      true,
 		ParamKeys:       []string{"file_path", "path", "file"},
 		SummaryPatterns: []*regexp.Regexp{regexp.MustCompile(`(?i)^(?:edit|write|patch)\s+(?:file\s+)?(.+)$`)},
 	},
@@ -5306,6 +5313,7 @@ var toolDescriptors = []toolDescriptor{
 		Aliases:         []string{"web_fetch", "webfetch", "web-fetch", "fetch"},
 		IconToken:       "language_outlined",
 		Title:           "Fetch web page",
+		SkipResult:      true,
 		Sanitizer:       toolSanitizerURL,
 		ParamKeys:       []string{"url"},
 		SummaryPatterns: []*regexp.Regexp{regexp.MustCompile(`(?i)^(?:fetch|open)\s+(?:web\s+page\s+)?(?:from\s+)?(.+)$`)},
@@ -5345,6 +5353,7 @@ var toolDescriptors = []toolDescriptor{
 		Aliases:         []string{"browser", "playwright", "navigate"},
 		IconToken:       "browser-mac_outlined",
 		Title:           "Browser",
+		SkipResult:      true,
 		Sanitizer:       toolSanitizerURL,
 		ParamKeys:       []string{"url"},
 		SummaryPatterns: []*regexp.Regexp{regexp.MustCompile(`(?i)^(?:open|browse|visit|navigate\s+to)\s+(.+)$`)},
@@ -6323,10 +6332,11 @@ func richStepBody(step core.ToolStep, lang string) string {
 	if summary != name {
 		row += "  " + summary
 	}
-	if mark := richStepFailureMark(step, lang); mark != "" {
+	mark := richStepFailureMark(step, lang)
+	if mark != "" {
 		row += "  " + mark
 	}
-	if result := strings.TrimSpace(step.Result); result != "" {
+	if result := strings.TrimSpace(step.Result); result != "" && !richStepSkipsResult(step, mark) {
 		return row + "\n" + result
 	}
 	return row
@@ -6351,6 +6361,19 @@ func richStepFailureMark(step core.ToolStep, lang string) string {
 		return fmt.Sprintf("%s (exit %d)", mark, *step.ExitCode)
 	}
 	return mark
+}
+
+// richStepSkipsResult reports whether this row drops the output it was handed.
+//
+// Only a clean run is dropped. core keeps a failed call's output at every
+// detail level precisely so this row can show it, and a tool opting out of its
+// own success payload must not take the error down with it.
+func richStepSkipsResult(step core.ToolStep, failureMark string) bool {
+	if failureMark != "" {
+		return false
+	}
+	desc := resolveToolDescriptor(step.Name)
+	return desc != nil && desc.SkipResult
 }
 
 // isCardJSON returns true if content looks like a complete Feishu card JSON

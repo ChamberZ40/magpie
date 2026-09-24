@@ -149,3 +149,60 @@ func TestRichStepBody_LeavesThinkingRowsAlone(t *testing.T) {
 		t.Errorf("body = %q, want the thinking text unchanged", got)
 	}
 }
+
+// For some tools the output is the flood by definition: a Read returns the
+// whole file, a fetch returns the whole page. The row already names the path or
+// the URL, so the payload adds nothing a reader wanted. Those tools opt out on
+// their descriptor, next to the rest of their display, rather than through a
+// title list wired into the renderer.
+func TestRichStepBody_SkipsOutputForToolsWhoseOutputIsTheFlood(t *testing.T) {
+	exit := 0
+	success := true
+	for _, tool := range []string{"read", "edit", "web_fetch", "browser"} {
+		step := core.ToolStep{
+			Kind: core.ToolStepKindTool, Name: tool, Summary: `{"file_path":"/main.go"}`,
+			Status: "completed", ExitCode: &exit, Success: &success,
+			Result: "package main\nfunc main() {}\n… 4000 more lines", Done: true,
+		}
+
+		got := richStepBody(step, "en")
+		if strings.Contains(got, "package main") {
+			t.Errorf("tool=%q body = %q, want the successful output left out", tool, got)
+		}
+		if lines := strings.Split(got, "\n"); len(lines) != 1 {
+			t.Errorf("tool=%q body = %q, want the row alone", tool, got)
+		}
+	}
+}
+
+// Opting out of the output must not opt out of the error. A Read that failed
+// says nothing at all without it, and core deliberately keeps a failed call's
+// output at every detail level so this row has something to show.
+func TestRichStepBody_KeepsFailureOutputEvenForSkippedTools(t *testing.T) {
+	failed := false
+	step := core.ToolStep{
+		Kind: core.ToolStepKindTool, Name: "read", Summary: `{"file_path":"/missing.go"}`,
+		Status: "failed", Success: &failed,
+		Result: "open /missing.go: no such file or directory", Done: true,
+	}
+
+	got := richStepBody(step, "en")
+	if !strings.Contains(got, "no such file or directory") {
+		t.Errorf("body = %q, want a failed call to keep the output that explains it", got)
+	}
+}
+
+// Tools not on the list are unaffected: a command's output is why you ran it.
+func TestRichStepBody_KeepsOutputForToolsNotOptedOut(t *testing.T) {
+	exit := 0
+	success := true
+	step := core.ToolStep{
+		Kind: core.ToolStepKindTool, Name: "Bash", Summary: `{"command":"npm test"}`,
+		Status: "completed", ExitCode: &exit, Success: &success,
+		Result: "all 42 tests passed", Done: true,
+	}
+
+	if got := richStepBody(step, "en"); !strings.Contains(got, "all 42 tests passed") {
+		t.Errorf("body = %q, want the output kept", got)
+	}
+}
