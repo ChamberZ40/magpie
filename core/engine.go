@@ -4961,6 +4961,49 @@ func agentErrorMessage(i18n *I18n, errMsg string) string {
 	return fmt.Sprintf(i18n.T(MsgError), errMsg)
 }
 
+// openRichCardEarly puts up an empty rich card for a user's message before the
+// agent has produced anything, so the round trips it costs overlap the agent
+// CLI's own start-up instead of delaying the first text. Scheduled prompts
+// (cron, timer, heartbeat) carry no message id and are left to open their card
+// lazily: they are where a bare NO_REPLY is expected, and a card opened for
+// nothing would have to be taken back. Returns nil when no card was opened.
+func (e *Engine) openRichCardEarly(p Platform, replyCtx any, msgID string) any {
+	if msgID == "" || e.display.CardMode != "rich" {
+		return nil
+	}
+	supporter, ok := p.(RichCardSupporter)
+	if !ok {
+		return nil
+	}
+	starter, ok := p.(PreviewStarter)
+	if !ok {
+		return nil
+	}
+	card := supporter.BuildRichCard(CardStatusThinking, string(e.i18n.CurrentLang()), nil, "", true, "")
+	handle, err := starter.SendPreviewStart(e.ctx, replyCtx, card)
+	if err != nil {
+		slog.Debug("rich card: failed to open card early", "platform", p.Name(), "error", err)
+		return nil
+	}
+	return handle
+}
+
+// closeRichCardAsFailed marks a card the turn never finished as failed.
+func (e *Engine) closeRichCardAsFailed(p Platform, handle any, steps []ToolStep, markdown, footer string) {
+	supporter, ok := p.(RichCardSupporter)
+	if !ok {
+		return
+	}
+	updater, ok := p.(MessageUpdater)
+	if !ok {
+		return
+	}
+	card := supporter.BuildRichCard(CardStatusError, string(e.i18n.CurrentLang()), steps, markdown, false, footer)
+	if err := updater.UpdateMessage(e.ctx, handle, card); err != nil {
+		slog.Debug("rich card: failed to close unfinished card", "platform", p.Name(), "error", err)
+	}
+}
+
 func (e *Engine) processInteractiveEvents(state *interactiveState, session *Session, sessions *SessionManager, sessionKey string, msgID string, turnStart time.Time, stopTypingFn func(), sendDone <-chan error, replyCtx any) {
 	if msgID != "" {
 		state.mu.Lock()
@@ -5029,12 +5072,29 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 	}
 	sp := newStreamPreview(e.streamPreview, state.platform, state.replyCtx, e.ctx, workspaceRenderer)
 	cp := newCompactProgressWriter(e.ctx, state.platform, state.replyCtx, e.agent.Name(), e.i18n.CurrentLang(), workspaceRenderer)
+	openingPlatform := state.platform
 	state.mu.Unlock()
+	if streamCard == nil {
+		cardMessageID = e.openRichCardEarly(openingPlatform, replyCtx, msgID)
+	}
+	// A card left open when the turn ends — the agent exited, timed out or
+	// was stopped before a result — would spin as "thinking" for good.
+	// cardSettled is set wherever the turn finishes the card itself.
+	cardSettled := false
+	defer func() {
+		if cardMessageID == nil || cardSettled {
+			return
+		}
+		state.mu.Lock()
+		p := state.platform
+		state.mu.Unlock()
+		e.closeRichCardAsFailed(p, cardMessageID, toolSteps, partialText, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
+	}()
 
 	// Send instant confirmation reply if enabled and no streaming card is active.
 	// Streaming cards provide their own "processing" indicator, so instant reply
 	// is only needed when the platform doesn't support cards or card creation failed.
-	if e.instantReply.Enabled && streamCard == nil {
+	if e.instantReply.Enabled && streamCard == nil && cardMessageID == nil {
 		replyContent := e.instantReply.Content
 		if replyContent == "" {
 			replyContent = e.i18n.T(MsgStarting)
@@ -5732,6 +5792,8 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				)
 				continue
 			}
+			// Every path below finishes the rich card one way or another.
+			cardSettled = true
 			cp.Finalize(ProgressCardStateCompleted)
 			// Use state.agentSession.CurrentSessionID() instead of event.SessionID.
 			// event.SessionID may be empty in some cases, causing the agent_session_id
@@ -5945,27 +6007,22 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				// accumulates every EventText chunk this turn, so it captures any
 				// pre-NO_REPLY content the user already saw streaming (e.g. when the
 				// agent wrote "Hello\nNO_REPLY"). Strip the trailing NO_REPLY marker
-				// before rendering. If there is neither body nor tool history, the
-				// card has nothing visible worth keeping; delete to avoid an
-				// orphaned shell. Finalizing-in-place avoids the "撤回了一条消息"
-				// gray bar that DeletePreviewMessage would leave in Lark.
+				// before rendering. A card with neither body nor tool history was
+				// opened early for a user's message; it is finished in place with
+				// a "no reply" line, since recalling it would leave a
+				// "撤回了一条消息" gray bar in Lark.
 				if hasRichCard && cardMessageID != nil {
 					silentBody := partialText
 					if stripped, ok := stripTrailingSilent(partialText); ok {
 						silentBody = strings.TrimRight(stripped, " \t\r\n")
 					}
-					if silentBody != "" || len(toolSteps) > 0 {
-						card := buildResolvedRichCard(CardStatusDone, toolSteps, silentBody, false, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
-						if updater, ok := p.(MessageUpdater); ok {
-							if err := updater.UpdateMessage(e.ctx, cardMessageID, card); err != nil {
-								slog.Debug("rich card: failed to finalize card on silent reply", "platform", p.Name(), "error", err)
-							}
-						}
-					} else {
-						if cleaner, ok := p.(PreviewCleaner); ok {
-							if err := cleaner.DeletePreviewMessage(e.ctx, cardMessageID); err != nil {
-								slog.Debug("rich card: failed to delete card on silent reply", "platform", p.Name(), "error", err)
-							}
+					if silentBody == "" && len(toolSteps) == 0 {
+						silentBody = e.i18n.T(MsgNoReplyContent)
+					}
+					card := buildResolvedRichCard(CardStatusDone, toolSteps, silentBody, false, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
+					if updater, ok := p.(MessageUpdater); ok {
+						if err := updater.UpdateMessage(e.ctx, cardMessageID, card); err != nil {
+							slog.Debug("rich card: failed to finalize card on silent reply", "platform", p.Name(), "error", err)
 						}
 					}
 					cardMessageID = nil
@@ -6203,9 +6260,13 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 						streamCard = sc
 					}
 				}
+				cardSettled = false
+				if streamCard == nil {
+					cardMessageID = e.openRichCardEarly(queued.platform, queued.replyCtx, queued.messageID)
+				}
 
 				// Send instant reply for queued turn if no streaming card is active.
-				if e.instantReply.Enabled && streamCard == nil {
+				if e.instantReply.Enabled && streamCard == nil && cardMessageID == nil {
 					replyContent := e.instantReply.Content
 					if replyContent == "" {
 						replyContent = e.i18n.T(MsgStarting)
@@ -6253,6 +6314,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			return
 
 		case EventError:
+			cardSettled = true
 			cp.Finalize(ProgressCardStateFailed)
 			sp.discard()
 			state.mu.Lock()

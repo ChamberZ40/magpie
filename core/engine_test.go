@@ -2007,8 +2007,11 @@ func TestProcessInteractiveEvents_RichCardShowsThinkingContent(t *testing.T) {
 	if len(starts) != 1 {
 		t.Fatalf("preview starts = %d, want 1", len(starts))
 	}
-	if !strings.Contains(starts[0], "Inspecting event routing") {
-		t.Fatalf("rich card start should contain thinking content, got %q", starts[0])
+	// The card opens empty before the first event; the thinking lands on it
+	// as an update.
+	edits := p.getPreviewEdits()
+	if len(edits) == 0 || !strings.Contains(edits[0], "Inspecting event routing") {
+		t.Fatalf("first card update should carry the thinking content, got %q", edits)
 	}
 }
 
@@ -2195,7 +2198,9 @@ func TestProcessInteractiveEvents_RichCardResolvesMarkdownImages(t *testing.T) {
 // runRichCardSilentScenario exercises processInteractiveEvents in rich
 // (Card 2.0) mode, sending the given EventText chunks followed by a terminal
 // EventResult. Returns call counts so each test case can assert the no-trace
-// invariant for the (chunk shape, final content) combination.
+// invariant for the (chunk shape, final content) combination. The turn runs
+// as a scheduled prompt (no message id): a user's message opens its card
+// before the first event, so the no-trace invariant only holds here.
 func runRichCardSilentScenario(t *testing.T, name string, chunks []string, finalContent string) (starts, streams, updates []string, deletes int) {
 	t.Helper()
 	p := &stubRichCardSilentPlatform{
@@ -2225,7 +2230,7 @@ func runRichCardSilentScenario(t *testing.T, name string, chunks []string, final
 	}
 	agentSession.events <- Event{Type: EventResult, Content: finalContent, Done: true}
 
-	e.processInteractiveEvents(state, session, e.sessions, sessionKey, "m-rich-silent-"+name, time.Now(), nil, nil, state.replyCtx)
+	e.processInteractiveEvents(state, session, e.sessions, sessionKey, "", time.Now(), nil, nil, state.replyCtx)
 	return p.snapshot()
 }
 
