@@ -1898,13 +1898,16 @@ func (p *Platform) resolveChatName(chatID string) string {
 		slog.Debug(p.tag()+": resolve chat name failed", "chat_id", chatID, "error", err)
 		return chatID
 	}
-	if !resp.Success() || resp.Data == nil || resp.Data.Name == nil {
-		slog.Debug(p.tag()+": resolve chat name: no data", "chat_id", chatID, "code", resp.Code)
+	if !resp.Success() {
+		slog.Debug(p.tag()+": resolve chat name: request refused", "chat_id", chatID, "code", resp.Code)
 		return chatID
 	}
-	name := *resp.Data.Name
-	if name == "" {
-		return chatID
+	// A chat with no name (a p2p chat, say) stays that way, and asking again
+	// costs a round trip in front of every inbound message, so the id itself
+	// is what gets remembered.
+	name := chatID
+	if resp.Data != nil && resp.Data.Name != nil && *resp.Data.Name != "" {
+		name = *resp.Data.Name
 	}
 	p.chatNameCache.Store(chatID, name)
 	return name
