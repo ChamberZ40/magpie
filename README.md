@@ -169,25 +169,33 @@ npm install -g @z40/magpie
 ### 4. First run
 
 ```bash
-magpie                     # auto-creates ~/.magpie/config.toml
+magpie                     # writes ~/.magpie/config.toml and exits
 ```
 
-It prints the admin URL:
+Open that file and set `work_dir` to the directory the agent should work in (it
+must already exist). Then start the bridge for real — this is the process to
+keep running:
 
+```bash
+magpie
 ```
-Web admin:  http://localhost:9820
-```
-
-To move it off 9820, set `port` under `[management]` in `config.toml`.
-
-> `magpie web` **only** opens the browser and the config UI — it does not start
-> the bridge. Keep `magpie` itself running.
 
 ### 5. Add platform credentials
 
-In the Web UI, create a project, add a platform (Feishu / WeChat Work / Weixin),
-and paste the credentials from that platform's developer console. Save; Magpie
+Either edit `config.toml` by hand — `magpie feishu setup` fills in the Feishu
+half for you — or use the Web UI. The Web UI is off by default; turn it on with:
+
+```bash
+magpie web                 # enables [management] in config.toml, opens the browser
+```
+
+The first time, this only writes the config, so restart `magpie` afterwards. The
+UI then lives at `http://localhost:9820` (set `port` under `[management]` to
+move it). Create a project, add a platform (Feishu / WeChat Work / Weixin), and
+paste the credentials from that platform's developer console. Save; Magpie
 hot-reloads. Send a message to your bot to confirm.
+
+> `magpie web` does not start the bridge. Keep `magpie` itself running.
 
 
 ## Run as a service
@@ -297,14 +305,15 @@ Use `/whoami` or `/status` in chat to find your own user ID.
 
 ### Session reset on idle
 
-Projects rotate to a fresh session after inactivity. This prevents context
-drift, where stale history (failed commands, debugging noise) is repeatedly
-re-ingested via `--continue` and starts to dominate the model's attention. The
-previous session is preserved and stays reachable via `/list` and `/switch`.
+A project can rotate to a fresh session after inactivity. Off by default; turn
+it on to prevent context drift, where stale history (failed commands, debugging
+noise) is repeatedly re-ingested via `--continue` and starts to dominate the
+model's attention. The previous session is preserved and stays reachable via
+`/list` and `/switch`.
 
 ```toml
 [[projects]]
-reset_on_idle_mins = 30   # default when unset; 0 disables rotation
+reset_on_idle_mins = 30   # minutes; unset or 0 keeps the current session
 ```
 
 ### Permission mode
@@ -315,7 +324,7 @@ mode = "default"
 ```
 
 Switchable at runtime with `/mode`. Values are agent-specific: Claude Code takes
-`default` / `acceptEdits` / `auto` / `plan` / `bypassPermissions`, Codex takes
+`default` / `acceptEdits` / `auto` / `plan` / `bypassPermissions` / `dontAsk`, Codex takes
 `suggest` / `auto-edit` / `full-auto` / `yolo`, Cursor takes `default` / `force`
 / `plan` / `ask`, Copilot takes `default` / `bypassPermissions`.
 

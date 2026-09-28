@@ -160,24 +160,31 @@ npm install -g @z40/magpie
 ### 4. 首次启动
 
 ```bash
-magpie                     # 自动创建 ~/.magpie/config.toml
+magpie                     # 写出 ~/.magpie/config.toml 后直接退出
 ```
 
-它会打印管理地址：
+打开这个文件，把 `work_dir` 设成 Agent 要工作的目录（目录必须已存在）。然后正式
+启动桥接服务——之后要一直跑着的就是这个进程：
 
+```bash
+magpie
 ```
-Web admin:  http://localhost:9820
-```
-
-想换掉 9820，在 `config.toml` 的 `[management]` 下设 `port`。
-
-> `magpie web` **只**打开浏览器和配置界面，**不会**启动桥接服务。
-> `magpie` 本身得单独跑着。
 
 ### 5. 填平台凭据
 
-在 Web UI 里建项目、加平台（飞书 / 企业微信 / 微信），把该平台开发者后台的凭据粘
-进去。保存后 Magpie 会热重载。给机器人发条消息验证一下。
+可以直接改 `config.toml`——飞书那部分用 `magpie feishu setup` 帮你填——也可以用
+Web UI。Web UI 默认是关的，用下面的命令打开：
+
+```bash
+magpie web                 # 在 config.toml 里启用 [management]，并打开浏览器
+```
+
+第一次执行只会写配置，所以之后要重启 `magpie`。Web UI 地址是
+`http://localhost:9820`（想换端口，在 `[management]` 下设 `port`）。在里面建项目、
+加平台（飞书 / 企业微信 / 微信），把该平台开发者后台的凭据粘进去。保存后 Magpie
+会热重载。给机器人发条消息验证一下。
+
+> `magpie web` **不会**启动桥接服务，`magpie` 本身得单独跑着。
 
 
 ## 作为服务运行
@@ -281,13 +288,13 @@ admin_from = "alice,bob"
 
 ### 空闲自动重置会话
 
-项目在长时间无操作后会轮换到新会话。这是为了防止上下文漂移——陈旧的历史记录
+项目可以在长时间无操作后轮换到新会话，默认关闭。打开它是为了防止上下文漂移——陈旧的历史记录
 （失败的命令、调试噪音）被 `--continue` 反复重新读入，逐渐主导模型的注意力。
 旧会话会保留，仍可通过 `/list` 和 `/switch` 访问。
 
 ```toml
 [[projects]]
-reset_on_idle_mins = 30   # 不设置时的默认值；设为 0 关闭轮换
+reset_on_idle_mins = 30   # 单位分钟；不设置或设为 0 则一直沿用当前会话
 ```
 
 ### 权限模式
@@ -298,7 +305,7 @@ mode = "default"
 ```
 
 运行时用 `/mode` 切换。取值按 Agent 而异：Claude Code 是 `default` /
-`acceptEdits` / `auto` / `plan` / `bypassPermissions`，Codex 是 `suggest` /
+`acceptEdits` / `auto` / `plan` / `bypassPermissions` / `dontAsk`，Codex 是 `suggest` /
 `auto-edit` / `full-auto` / `yolo`，Cursor 是 `default` / `force` / `plan` /
 `ask`，Copilot 是 `default` / `bypassPermissions`。
 
