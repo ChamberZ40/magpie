@@ -19,9 +19,23 @@ walk away from the desk, and you steer it from your phone.
 > platforms it actually uses, and no longer tracks upstream. It is not
 > affiliated with or endorsed by the upstream project. See [License](#license).
 
-<p align="center">
-  <img src="docs/images/connector.png" alt="Magpie Architecture" width="90%"/>
-</p>
+```mermaid
+flowchart LR
+  subgraph Chat["Chat apps"]
+    Feishu["Feishu / Lark"]
+    WeCom["WeChat Work"]
+    Weixin["Weixin"]
+  end
+  Magpie(["Magpie<br/>on your machine"])
+  subgraph Agents["Coding agents"]
+    Claude["Claude Code"]
+    Codex["Codex"]
+    Cursor["Cursor Agent"]
+    Copilot["GitHub Copilot CLI"]
+    ACP["ACP agents"]
+  end
+  Chat <--> Magpie <--> Agents
+```
 
 
 ## Quick start

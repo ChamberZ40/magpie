@@ -16,9 +16,23 @@
 > 代码主体来自上游；本 fork 把它裁剪到自己实际用得到的 Agent 与平台，并且不再
 > 跟随上游更新。本项目与上游没有隶属关系，也未获其背书。详见[许可](#许可)。
 
-<p align="center">
-  <img src="docs/images/connector.png" alt="Magpie Architecture" width="90%"/>
-</p>
+```mermaid
+flowchart LR
+  subgraph Chat["聊天应用"]
+    Feishu["飞书 / Lark"]
+    WeCom["企业微信"]
+    Weixin["微信"]
+  end
+  Magpie(["Magpie<br/>运行在你的电脑上"])
+  subgraph Agents["编码 Agent"]
+    Claude["Claude Code"]
+    Codex["Codex"]
+    Cursor["Cursor Agent"]
+    Copilot["GitHub Copilot CLI"]
+    ACP["ACP agents"]
+  end
+  Chat <--> Magpie <--> Agents
+```
 
 
 ## 快速开始
