@@ -437,6 +437,6 @@ proxy = "http://vps-ip:8888"
 
 ## 下一步
 
-- [接入飞书](./feishu.md)
+- [接入飞书](./feishu.zh-CN.md)
 - [接入微信（个人 ilink）](./weixin.md)
 - [返回首页](../README.md)

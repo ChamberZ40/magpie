@@ -78,7 +78,7 @@ magpie                     # 创建 ~/.magpie/config.toml 后退出
 
 | 平台 | 连接方式 | 需要公网 IP？ | 接入指南 |
 |------|----------|---------------|----------|
-| 飞书 (Lark) | WebSocket | 不需要 | [docs/feishu.md](docs/feishu.md) |
+| 飞书 (Lark) | WebSocket | 不需要 | [docs/feishu.zh-CN.md](docs/feishu.zh-CN.md) |
 | 企业微信 | WebSocket / Webhook | WS 不需要 / Webhook 需要 | [docs/wecom.md](docs/wecom.md) |
 | 微信（个人，ilink） | HTTP 长轮询 | 不需要 | [docs/weixin.md](docs/weixin.md) |
 
