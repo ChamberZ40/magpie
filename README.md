@@ -60,13 +60,14 @@ Either way, you also need an agent CLI that is installed **and logged in** —
 magpie spawns it as a subprocess and inherits its credentials. Then:
 
 ```bash
-magpie feishu setup        # or: magpie weixin setup — scan the QR code
+magpie init
 ```
 
-That writes the bot into `~/.magpie/config.toml`, creating the file if needed.
-Open it and set `work_dir` to the directory the agent should work in (it must
-already exist); `magpie config example` prints every option, annotated. Then run
-`magpie` and message the bot to confirm the round trip works.
+It walks you through picking the agent, the directory it works in, and the chat
+app (Feishu or Weixin: scan a QR code), turns on the recommended settings, and
+starts magpie. Message the bot to confirm the round trip works. Everything is
+written to `~/.magpie/config.toml`; `magpie config example` prints every option,
+annotated.
 
 To enable the Web admin UI once the bridge is running, use `magpie web`, or
 `/web setup` from the chat.
@@ -165,7 +166,15 @@ npm install -g @z40/magpie
 [Releases](https://github.com/ChamberZ40/magpie/releases), unpack it, and put
 `magpie` on your `PATH`.
 
-### 4. Connect a chat app
+### 4. Connect a chat app and start
+
+```bash
+magpie init
+```
+
+A guided setup that does steps 4–5 below for you: agent, `work_dir`, chat app
+(QR code), recommended settings, and starting magpie as a service or in the
+terminal. The rest of this section is the manual route.
 
 ```bash
 magpie feishu setup        # Feishu / Lark: scan the QR code, a bot is created for you

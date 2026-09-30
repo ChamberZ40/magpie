@@ -58,7 +58,10 @@ func indentedSetupCommands(indent string) string {
 func firstRunGuide(configPath string) string {
 	return fmt.Sprintf(`Created a starter config at %s
 
-Next steps:
+Quickest way to finish, one question at a time:
+  magpie init
+
+Or by hand:
   1. Open that file and set work_dir to the directory the agent should work in.
   2. Connect a chat app. Each command shows a QR code to scan:
 %s  3. Run magpie again, then message your bot.
@@ -116,6 +119,9 @@ func workDirReminder(configPath, project string) string {
 
 // printSetupNextSteps closes a successful setup command.
 func printSetupNextSteps(configPath, project string) {
+	if inInitWizard {
+		return
+	}
 	if note := workDirReminder(configPath, project); note != "" {
 		fmt.Println("⚠️  " + note)
 	}

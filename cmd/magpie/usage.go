@@ -152,6 +152,9 @@ Flags:
   --help             Show this help message
 
 Commands:
+  init               Guided setup: agent, work_dir, chat app (QR code), then start
+                     (--config <path>, --project <name>, --yes to accept defaults)
+
   daemon             Manage magpie as a background service (systemd/launchd/schtasks)
     install          Install and start the daemon service
     uninstall        Remove the daemon service
@@ -224,6 +227,7 @@ Commands:
   config-example     (deprecated: use 'config example' instead)
 
 Examples:
+  magpie init                     First-time guided setup
   magpie                          Start with default config
   magpie --config /path/to.toml   Start with a specific config file
   magpie daemon install           Install as a system service

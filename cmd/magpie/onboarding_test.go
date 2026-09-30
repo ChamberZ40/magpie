@@ -181,3 +181,16 @@ func assertRealCommand(t *testing.T, cmd string) {
 		t.Errorf("%q names a command that does not exist", cmd)
 	}
 }
+
+func TestOnboardingText_PointsAtInit(t *testing.T) {
+	if _, ok := topLevelCommandHandlers["init"]; !ok {
+		t.Fatal("init is not a registered command")
+	}
+	if !strings.Contains(firstRunGuide("/tmp/x/config.toml"), "magpie init") {
+		t.Error("first-run guide should suggest magpie init")
+	}
+	hint := configLoadErrorHint("/tmp/config.toml", fmt.Errorf("config: x %w", config.ErrNoPlatforms))
+	if !strings.Contains(hint, "magpie init") {
+		t.Error("no-platform hint should suggest magpie init")
+	}
+}

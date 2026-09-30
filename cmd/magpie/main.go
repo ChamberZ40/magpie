@@ -222,6 +222,7 @@ var topLevelCommandHandlers = map[string]func([]string){
 	"weixin":    runWeixin,
 	"doctor":    runDoctor,
 	"web":       runWeb,
+	"init":      runInit,
 }
 
 func main() {
@@ -1577,7 +1578,11 @@ func configLoadErrorHint(configPath string, err error) string {
 	if errors.Is(err, config.ErrNoPlatforms) && len(setupCommands()) > 0 {
 		return fmt.Sprintf(`Error loading config (%s): %v
 
-Connect a chat app first. Each command shows a QR code to scan, then writes
+Connect a chat app first. The guided setup does it for you:
+
+  magpie init
+
+Or run a setup command directly. Each shows a QR code to scan, then writes
 the platform into that file:
 
 %s

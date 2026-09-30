@@ -203,6 +203,10 @@ func runWeixinSetup(args []string, requestedMode string) {
 		fmt.Printf("   allow_from: %s\n", saveResult.AllowFrom)
 	}
 	fmt.Println()
+	if inInitWizard {
+		fmt.Println("Once magpie is running, send the first message from WeChat: magpie can only reply after it has seen one.")
+		return
+	}
 	if note := workDirReminder(config.ConfigPath, saveResult.ProjectName); note != "" {
 		fmt.Println("⚠️  " + note)
 	}

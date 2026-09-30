@@ -14,42 +14,35 @@ You need a coding agent CLI that is installed **and logged in** — magpie runs
 it for you and uses its login. For example, Claude Code: run `claude` once and
 log in. No public IP or server is needed; everything runs on this machine.
 
-## Get a first reply in four steps
-
-**1. Install.**
+## Get a first reply
 
 ```bash
 npm install -g @z40/magpie
+magpie init
 ```
 
-**2. Connect a chat app.** Pick one. The command shows a QR code in the
-terminal; scan it with your phone and it writes the bot into
-`~/.magpie/config.toml` (creating that file if needed):
+`magpie init` asks a few questions, one at a time: which agent to use, which
+directory it works in (default: the current one), and which chat app to
+connect. Feishu and Weixin both show a QR code in the terminal; scan it with
+your phone. It then turns on the recommended settings (each one can be declined)
+and starts magpie, as a background service or in the terminal. Message your
+bot; a reply means it works. On Weixin, send the first message yourself —
+magpie can only reply once it has seen one.
+
+Everything lands in `~/.magpie/config.toml`. Running `magpie init` again is
+safe: it keeps what is there and asks before adding anything.
+
+### By hand, instead
 
 ```bash
 magpie feishu setup     # Feishu / Lark: creates a bot for you
 magpie weixin setup     # Weixin: links your personal WeChat
 ```
 
-**3. Tell the agent where to work.** Open `~/.magpie/config.toml` and set
-`work_dir` to your project directory (it must already exist):
-
-```toml
-[projects.agent.options]
-work_dir = "/Users/you/code/my-project"
-```
-
-The agent is Claude Code by default; change `type` under `[projects.agent]` to
-`codex`, `cursor`, `copilot` or `acp` to use another.
-
-**4. Start it, then message your bot.**
-
-```bash
-magpie
-```
-
-A reply in the chat means it works. On Weixin, send the first message yourself
-— magpie can only reply once it has seen one.
+Then open `~/.magpie/config.toml`, set `work_dir` under
+`[projects.agent.options]` to an existing project directory (and `type` under
+`[projects.agent]` if you want `codex`, `cursor`, `copilot` or `acp` instead of
+Claude Code), and run `magpie`.
 
 ## Keep it running
 
@@ -70,8 +63,8 @@ magpie --help             # every command, plus the agents and platforms this bu
 
 - **The agent says it is not logged in** — run the agent CLI (e.g. `claude`)
   once by hand and log in.
-- **`work_dir ... does not exist`** — step 3: point `work_dir` at a real directory.
-- **`needs at least one [[projects.platforms]]`** — step 2 has not been run yet.
+- **`work_dir ... does not exist`** — point `work_dir` at a real directory, or rerun `magpie init`.
+- **`needs at least one [[projects.platforms]]`** — no chat app is connected yet: run `magpie init`.
 
 Platform guides, for options beyond the QR-code setup:
 [Feishu](https://github.com/ChamberZ40/magpie/blob/main/docs/feishu.md) ·

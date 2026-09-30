@@ -204,7 +204,7 @@ async function main() {
   }
 
   console.log(`[magpie] Installed to ${binaryPath}`);
-  console.log("[magpie] Next: run `magpie` for a starter config and step-by-step setup.");
+  console.log("[magpie] Quick setup: run `magpie init`.");
 }
 
 main().catch((err) => {

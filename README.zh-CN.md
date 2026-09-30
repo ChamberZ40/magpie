@@ -56,12 +56,12 @@ make build                 # 产物为 ./magpie
 拉起它，并沿用它的登录凭据。然后：
 
 ```bash
-magpie feishu setup        # 或：magpie weixin setup —— 扫码即可
+magpie init
 ```
 
-它会把机器人写进 `~/.magpie/config.toml`（文件不存在就先创建）。打开这个文件，把
-`work_dir` 指向你要让 Agent 干活的目录（该目录必须已存在）；`magpie config example`
-会打印带注释的全量配置示例。然后跑 `magpie`，给机器人发条消息确认链路通了。
+它会一步步问你：用哪个 Agent、在哪个目录干活、接哪个聊天应用（飞书或微信，扫码即可），
+再打开推荐设置，最后启动 magpie。给机器人发条消息确认链路通了。所有配置都写在
+`~/.magpie/config.toml`；`magpie config example` 会打印带注释的全量配置示例。
 
 桥跑起来之后想开 Web 管理界面，用 `magpie web`，或在聊天里发 `/web setup`。
 
@@ -157,7 +157,14 @@ npm install -g @z40/magpie
 [Releases](https://github.com/ChamberZ40/magpie/releases) 里挑你平台的压缩包，
 解压后把 `magpie` 放进 `PATH`。
 
-### 4. 接入聊天应用
+### 4. 接入聊天应用并启动
+
+```bash
+magpie init
+```
+
+引导式配置，替你完成下面第 4–5 步：选 Agent、设 `work_dir`、扫码接入聊天应用、
+打开推荐设置，然后以后台服务或在终端里启动 magpie。本节其余部分是手动配置的做法。
 
 ```bash
 magpie feishu setup        # 飞书 / Lark：扫码，自动帮你建好机器人
