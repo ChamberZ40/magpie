@@ -1,6 +1,6 @@
 {
   "name": "@z40/magpie",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Bridge local AI coding agents (Claude Code, Codex, Cursor, GitHub Copilot, any ACP agent) to messaging platforms (Feishu/Lark, WeChat Work, Weixin)",
   "keywords": [
     "claude-code",
@@ -36,11 +36,11 @@
     "platforms.json"
   ],
   "optionalDependencies": {
-    "@z40/magpie-darwin-arm64": "1.0.4",
-    "@z40/magpie-darwin-x64": "1.0.4",
-    "@z40/magpie-linux-arm64": "1.0.4",
-    "@z40/magpie-linux-x64": "1.0.4",
-    "@z40/magpie-win32-arm64": "1.0.4",
-    "@z40/magpie-win32-x64": "1.0.4"
+    "@z40/magpie-darwin-arm64": "1.0.5",
+    "@z40/magpie-darwin-x64": "1.0.5",
+    "@z40/magpie-linux-arm64": "1.0.5",
+    "@z40/magpie-linux-x64": "1.0.5",
+    "@z40/magpie-win32-arm64": "1.0.5",
+    "@z40/magpie-win32-x64": "1.0.5"
   }
 }
