@@ -40,7 +40,17 @@ function getPlatformInfo() {
   return { platform, arch, ext, filename };
 }
 
+// MAGPIE_DOWNLOAD_BASE points the installer at a mirror laid out like the
+// GitHub releases path (<base>/<version>/<file>) — a local dist/ when
+// rehearsing a release before its tag exists, or a closer mirror.
 function getDownloadURLs(filename) {
+  const base = (process.env.MAGPIE_DOWNLOAD_BASE || "").trim();
+  if (base) {
+    if (!/^https?:\/\//.test(base)) {
+      throw new Error(`MAGPIE_DOWNLOAD_BASE must be an http(s) URL, got: ${base}`);
+    }
+    return [`${base.replace(/\/+$/, "")}/${VERSION}/${filename}`];
+  }
   return [
     `https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${filename}`,
   ];
