@@ -7,11 +7,28 @@ const path = require("path");
 const fs = require("fs");
 
 const PACKAGE = require("./package.json");
+const { forHost, packageName, binaryName } = require("./platforms");
 const EXPECTED_VER = PACKAGE.version; // e.g. "1.1.0-beta.4"
 const NAME = "magpie";
 const binDir = path.join(__dirname, "bin");
 const ext = process.platform === "win32" ? ".exe" : "";
-const binaryPath = path.join(binDir, NAME + ext);
+// fallbackPath is where install.js downloads the binary when the platform
+// package is absent (--omit=optional, or a platform without one).
+const fallbackPath = path.join(binDir, NAME + ext);
+
+// platformBinary finds the binary npm installed with this machine's platform
+// package. It is pinned to this wrapper's exact version, so no version check.
+function platformBinary() {
+  const platform = forHost();
+  if (!platform) return null;
+  try {
+    const manifest = require.resolve(`${packageName(platform)}/package.json`, { paths: [__dirname] });
+    const candidate = path.join(path.dirname(manifest), "bin", binaryName(platform));
+    return fs.existsSync(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
+}
 
 // parseVersion splits "1.2.3-beta.1" into { nums: [1,2,3], preTag: "beta", preNum: 1 }
 function parseVersion(v) {
@@ -44,9 +61,9 @@ function isNewerOrEqual(installed, expected) {
 }
 
 function needsReinstall() {
-  if (!fs.existsSync(binaryPath)) return true;
+  if (!fs.existsSync(fallbackPath)) return true;
   try {
-    const out = execFileSync(binaryPath, ["--version"], { encoding: "utf8", timeout: 5000 });
+    const out = execFileSync(fallbackPath, ["--version"], { encoding: "utf8", timeout: 5000 });
     if (out.includes(EXPECTED_VER)) return false;
     // Extract version from output (e.g. "magpie 1.2.2-beta.1" or "1.2.2-beta.1")
     const match = out.match(/(\d+\.\d+\.\d+[^\s]*)/);
@@ -57,21 +74,26 @@ function needsReinstall() {
   }
 }
 
-if (needsReinstall()) {
-  console.log(`[magpie] Binary missing or outdated, installing v${EXPECTED_VER}...`);
-  try {
-    execSync("node " + JSON.stringify(path.join(__dirname, "install.js")), {
-      stdio: "inherit",
-      cwd: __dirname,
-    });
-  } catch {
-    console.error("[magpie] Auto-install failed. Run manually: npm uninstall -g @z40/magpie && npm install -g @z40/magpie");
-    process.exit(1);
+function resolveBinary() {
+  const bundled = platformBinary();
+  if (bundled) return bundled;
+  if (needsReinstall()) {
+    console.log(`[magpie] Binary missing or outdated, installing v${EXPECTED_VER}...`);
+    try {
+      execSync("node " + JSON.stringify(path.join(__dirname, "install.js")), {
+        stdio: "inherit",
+        cwd: __dirname,
+      });
+    } catch {
+      console.error("[magpie] Auto-install failed. Run manually: npm uninstall -g @z40/magpie && npm install -g @z40/magpie");
+      process.exit(1);
+    }
   }
+  return fallbackPath;
 }
 
 try {
-  execFileSync(binaryPath, process.argv.slice(2), { stdio: "inherit" });
+  execFileSync(resolveBinary(), process.argv.slice(2), { stdio: "inherit" });
 } catch (err) {
   process.exit(err.status || 1);
 }

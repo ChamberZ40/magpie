@@ -1,102 +1,129 @@
 #!/usr/bin/env bash
-# Rehearse `npm install -g @z40/magpie` end to end without publishing anything:
-# build this checkout for the host, serve it the way a GitHub release would,
-# and install the packed npm wrapper from that local mirror into a throwaway
-# prefix and HOME. Your real global magpie, ~/.magpie and service are untouched.
+# Rehearse a release end to end without publishing anything: build this
+# checkout for every platform, serve it the way a GitHub release would, run
+# npm/publish.sh against a throwaway local registry (verdaccio), then install
+# from that registry the way a user would. Your real global magpie, ~/.magpie,
+# npm login and service are untouched.
 #
 #   npm/rehearse-install.sh [version]   # default: npm/package.json
 #
-# Leaves everything under $REHEARSE_DIR (default: a fresh temp dir) and prints
-# how to run the installed magpie from there.
+# Checks, with npm 12 and npm 11: the install prints no install-script warning,
+# the binary is already there when npm returns, and `magpie --help` lists init.
+# Then without the platform package, which must fall back to downloading.
+# Needs the network for npx (set https_proxy if you use one).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-$(node -p "require('$ROOT/npm/package.json').version")}"
 WORK="${REHEARSE_DIR:-$(mktemp -d -t magpie-rehearse)}"
-PORT="${PORT:-8765}"
-GOOS="$(go env GOOS)"
-GOARCH="$(go env GOARCH)"
+MIRROR_PORT="${MIRROR_PORT:-8765}"
+REGISTRY_PORT="${REGISTRY_PORT:-4873}"
+REGISTRY="http://127.0.0.1:$REGISTRY_PORT/"
 
-if [ "$GOOS" = "windows" ]; then
-  echo "rehearse: run this on macOS or Linux" >&2
-  exit 1
-fi
-
-mkdir -p "$WORK/mirror/v$VERSION" "$WORK/home"
+rm -rf "$WORK/mirror" "$WORK/registry" "$WORK/home"
+mkdir -p "$WORK/mirror/v$VERSION" "$WORK/registry" "$WORK/home"
 echo "rehearse: working in $WORK"
+pids=()
+trap 'kill "${pids[@]}" 2>/dev/null || true' EXIT
 
-# 1. The release archive, named exactly as npm/install.js expects.
-bin_name="magpie-v$VERSION-$GOOS-$GOARCH"
-(cd "$ROOT" && CGO_ENABLED=0 go build \
-  -ldflags "-s -w -X main.version=v$VERSION -X main.commit=$(git rev-parse --short HEAD)" \
-  -o "$WORK/mirror/v$VERSION/$bin_name" ./cmd/magpie)
-(cd "$WORK/mirror/v$VERSION" && tar czf "$bin_name.tar.gz" "$bin_name" && rm "$bin_name")
+# 1. Release binaries for every platform, named as `make release-all` names them.
+echo "rehearse: building $VERSION for every platform"
+node -e 'for (const p of require(process.argv[1])) console.log(p.goos, p.goarch)' \
+  "$ROOT/npm/platforms.json" | while read -r goos goarch; do
+  ext=""; [ "$goos" = windows ] && ext=".exe"
+  (cd "$ROOT" && GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build \
+    -ldflags "-s -w -X main.version=v$VERSION -X main.commit=$(git rev-parse --short HEAD)" \
+    -o "$WORK/mirror/v$VERSION/magpie-v$VERSION-$goos-$goarch$ext" ./cmd/magpie)
+done
+host="magpie-v$VERSION-$(go env GOOS)-$(go env GOARCH)"
+(cd "$WORK/mirror/v$VERSION" && tar czf "$host.tar.gz" "$host" && shasum -a 256 magpie-* >checksums.txt)
 
-# 2. The npm package as `npm publish` would upload it, at the rehearsed version.
-rm -rf "$WORK/pkg"
-cp -R "$ROOT/npm" "$WORK/pkg"
-rm -rf "$WORK/pkg/bin"
-(cd "$WORK/pkg" && npm pkg set version="$VERSION" >/dev/null \
-  && npm pack --silent --pack-destination "$WORK" >/dev/null)
-tarball="$WORK/z40-magpie-$VERSION.tgz"
-
-# 3. Serve the mirror and install from it.
-python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$WORK/mirror" \
+# 2. A release mirror and an empty registry that accepts anonymous-ish publishes.
+python3 -m http.server "$MIRROR_PORT" --bind 127.0.0.1 --directory "$WORK/mirror" \
   >"$WORK/mirror.log" 2>&1 &
-server=$!
-trap 'kill "$server" 2>/dev/null || true' EXIT
-sleep 1
+pids+=($!)
+cat >"$WORK/registry/config.yaml" <<EOF
+storage: $WORK/registry/storage
+max_body_size: 200mb
+auth:
+  htpasswd:
+    file: $WORK/registry/htpasswd
+    max_users: 10
+uplinks: {}
+packages:
+  '**':
+    access: \$all
+    publish: \$authenticated
+log: { type: stdout, format: pretty, level: warn }
+EOF
+npx -y verdaccio@6 --config "$WORK/registry/config.yaml" --listen "127.0.0.1:$REGISTRY_PORT" \
+  >"$WORK/registry.log" 2>&1 &
+pids+=($!)
+for _ in $(seq 1 60); do curl -fs "${REGISTRY}-/ping" >/dev/null 2>&1 && break; sleep 1; done
+token="$(curl -fs -X PUT "${REGISTRY}-/user/org.couchdb.user:rehearse" \
+  -H 'content-type: application/json' -d '{"name":"rehearse","password":"rehearse-only"}' \
+  | node -e 'process.stdin.on("data", (d) => console.log(JSON.parse(d).token))')"
+printf '//127.0.0.1:%s/:_authToken=%s\n' "$REGISTRY_PORT" "$token" >"$WORK/npmrc"
 
-# npm 12 blocks package install scripts by default, so a plain install leaves
-# the download (and the "magpie init" hint) to the wrapper's first run; npm 11
-# and older still run postinstall. Rehearse both. The npm 11 run is fetched
-# with npx, so it needs the network (set https_proxy if you use one).
-mirror_env=(HOME="$WORK/home" NO_PROXY=127.0.0.1 no_proxy=127.0.0.1
-  MAGPIE_DOWNLOAD_BASE="http://127.0.0.1:$PORT")
+# npm 11 still runs install scripts; fetch it before npm is pointed at the
+# local registry, which has nothing but magpie.
+npm install --prefix "$WORK/npm11" npm@11 >"$WORK/npm11.log" 2>&1 \
+  || { cat "$WORK/npm11.log"; echo "rehearse: FAIL could not fetch npm 11" >&2; exit 1; }
+
+# Everything npm does from here sees only the sandbox.
+export HOME="$WORK/home" NPM_CONFIG_USERCONFIG="$WORK/npmrc" NPM_CONFIG_REGISTRY="$REGISTRY"
+export NO_PROXY=127.0.0.1 no_proxy=127.0.0.1
+export MAGPIE_DOWNLOAD_BASE="http://127.0.0.1:$MIRROR_PORT"
+
+# 3. The real publish script, pointed at the mirror and the local registry.
+"$ROOT/npm/publish.sh" "$VERSION" >"$WORK/publish.log" 2>&1 \
+  || { cat "$WORK/publish.log"; echo "rehearse: FAIL publish.sh" >&2; exit 1; }
+grep '^publish:' "$WORK/publish.log"
+
+# 4. Install the way a user would, and check what they get.
 fail=0
-check() { # check <label> <log with the hint> <prefix>
-  local version help
-  version="$(env "${mirror_env[@]}" "$3/bin/magpie" --version 2>&1 || true)"
-  help="$(env "${mirror_env[@]}" "$3/bin/magpie" --help 2>&1 || true)"
-  grep -q "magpie init" "$2" \
-    || { echo "rehearse: FAIL [$1] no magpie init hint in $2" >&2; fail=1; }
-  [[ "$version" == *"$VERSION"* ]] \
-    || { echo "rehearse: FAIL [$1] installed binary is not $VERSION" >&2; fail=1; }
-  [[ "$help" == *" init"* ]] \
-    || { echo "rehearse: FAIL [$1] --help does not list init" >&2; fail=1; }
-  [ "$fail" -ne 0 ] || echo "rehearse: ok [$1]"
+check_install() { # check_install <label> <npm command...>
+  local label="$1" prefix="$WORK/prefix-${1// /-}" log out before="$fail"
+  shift
+  rm -rf "$prefix"
+  log="$WORK/install-${label// /-}.log"
+  "$@" install -g --prefix "$prefix" "@z40/magpie@$VERSION" >"$log" 2>&1 \
+    || { cat "$log"; echo "rehearse: FAIL [$label] npm install" >&2; fail=1; return; }
+  if grep -qi "install-scripts\|allowScripts" "$log"; then
+    cat "$log"; echo "rehearse: FAIL [$label] npm warned about install scripts" >&2; fail=1
+  fi
+  if ! ls "$prefix"/lib/node_modules/@z40/magpie/node_modules/@z40/magpie-*/bin/magpie* >/dev/null 2>&1; then
+    echo "rehearse: FAIL [$label] no platform binary after npm install" >&2; fail=1
+  fi
+  out="$("$prefix/bin/magpie" --version 2>&1 || true)"
+  if [[ "$out" == *"[magpie]"* ]]; then
+    echo "$out"; echo "rehearse: FAIL [$label] first run still downloaded" >&2; fail=1
+  fi
+  [[ "$out" == *"$VERSION"* ]] || { echo "rehearse: FAIL [$label] got: $out" >&2; fail=1; }
+  [[ "$("$prefix/bin/magpie" --help 2>&1)" == *" init"* ]] \
+    || { echo "rehearse: FAIL [$label] --help does not list init" >&2; fail=1; }
+  [ "$fail" -ne "$before" ] || echo "rehearse: ok [$label]"
 }
+check_install "npm $(npm --version)" npm
+check_install "npm 11" "$WORK/npm11/node_modules/.bin/npm"
 
-rm -rf "$WORK/prefix" "$WORK/prefix-npm11"
-env "${mirror_env[@]}" npm install -g --prefix "$WORK/prefix" "$tarball" \
-  >"$WORK/install-default.log" 2>&1
-env "${mirror_env[@]}" "$WORK/prefix/bin/magpie" --version >"$WORK/first-run.log" 2>&1
-echo "--- npm $(npm --version) install, then first run:"; cat "$WORK/first-run.log"
-check "npm $(npm --version)" "$WORK/first-run.log" "$WORK/prefix"
-
-if env "${mirror_env[@]}" npx -y npm@11 install -g --foreground-scripts \
-  --prefix "$WORK/prefix-npm11" "$tarball" >"$WORK/install-npm11.log" 2>&1; then
-  echo "--- npm 11 install:"; grep '^\[magpie\]' "$WORK/install-npm11.log" || true
-  check "npm 11" "$WORK/install-npm11.log" "$WORK/prefix-npm11"
+# Without its platform package (a platform with none, or one npm skipped) the
+# wrapper must fall back to downloading the binary on first run.
+prefix="$WORK/prefix-fallback"
+rm -rf "$prefix"
+npm install -g --prefix "$prefix" "@z40/magpie@$VERSION" >"$WORK/install-fallback.log" 2>&1
+rm -rf "$prefix"/lib/node_modules/@z40/magpie/node_modules/@z40
+out="$("$prefix/bin/magpie" --version 2>&1 || true)"
+if [[ "$out" == *"Quick setup: run \`magpie init\`"* && "$out" == *"$VERSION"* ]]; then
+  echo "rehearse: ok [no platform package: downloads on first run]"
 else
-  echo "rehearse: skip [npm 11] could not run npx npm@11 — see $WORK/install-npm11.log" >&2
+  echo "$out"; echo "rehearse: FAIL [no platform package] fallback download" >&2; fail=1
 fi
 
 [ "$fail" -eq 0 ] || exit 1
-magpie="$WORK/prefix/bin/magpie"
-
 cat <<EOF
 
-rehearse: OK — installed $VERSION into $WORK/prefix
-
-Try it as a brand-new user (sandboxed HOME, nothing of yours is read):
-  export PATH="$WORK/prefix/bin:\$PATH"
-  HOME="$WORK/home" magpie init
-
-To get a real reply you need your real agent login, so use your real HOME but
-a separate config, and stop your running service first so two magpies do not
-answer the same bot:
-  magpie daemon stop
-  $magpie init --config "$WORK/config.toml"     # choose "run in this terminal"
-  magpie daemon start                           # afterwards
+rehearse: OK — $VERSION published to a local registry and installed cleanly.
+Try the installed magpie as a brand-new user (sandboxed HOME):
+  HOME="$WORK/home" "$WORK/prefix-npm-$(npm --version)/bin/magpie" init
 EOF

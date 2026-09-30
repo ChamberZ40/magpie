@@ -35,8 +35,9 @@ make build
 npm install -g @z40/magpie
 ```
 
-The postinstall script downloads the prebuilt binary for this platform from the
-matching GitHub release, so the `magpie` command becomes available globally.
+npm picks the prebuilt binary for this machine from a per-platform package
+(`@z40/magpie-darwin-arm64` and so on), so `magpie` works as soon as the
+install returns — no install script runs. Then run `magpie init`.
 
 ### Option C: Download binary from GitHub Releases
 

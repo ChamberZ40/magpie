@@ -6,8 +6,10 @@ name: Release
 #
 # The tag name is passed straight through as make's VERSION, so the archives
 # land at magpie-v1.0.0-<os>-<arch>.{tar.gz,zip} — exactly the names npm/
-# install.js builds its download URL from. Keep npm/package.json's version in
-# step with the tag, or `npm install -g @z40/magpie` will 404.
+# install.js builds its download URL from. Bump with `node npm/set-version.js`
+# before tagging, then publish to npm once this workflow has finished:
+#
+#   npm/publish.sh 1.0.0   # six platform packages from these assets, then the wrapper
 
 on:
   push:

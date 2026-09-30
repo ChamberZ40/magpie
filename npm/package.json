@@ -28,12 +28,19 @@
   "bin": {
     "magpie": "run.js"
   },
-  "scripts": {
-    "postinstall": "node install.js"
-  },
   "files": [
     "install.js",
     "run.js",
-    "README.md"
-  ]
+    "README.md",
+    "platforms.js",
+    "platforms.json"
+  ],
+  "optionalDependencies": {
+    "@z40/magpie-darwin-arm64": "1.0.4",
+    "@z40/magpie-darwin-x64": "1.0.4",
+    "@z40/magpie-linux-arm64": "1.0.4",
+    "@z40/magpie-linux-x64": "1.0.4",
+    "@z40/magpie-win32-arm64": "1.0.4",
+    "@z40/magpie-win32-x64": "1.0.4"
+  }
 }
