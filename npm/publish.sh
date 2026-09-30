@@ -4,7 +4,7 @@
 #
 #   npm/publish.sh <version>          # e.g. npm/publish.sh 1.0.5
 #
-# The binaries come from the release itself (checked against its
+# The binaries come from the release's archives (checked against its
 # checksums.txt), so npm ships exactly what GitHub does. Platform packages go
 # first: once the wrapper is public, every install resolves its pinned
 # optionalDependencies, and a missing one silently drops users onto the
@@ -37,19 +37,28 @@ trap 'rm -rf "$work"' EXIT
 
 echo "publish: fetching release binaries from $base"
 curl -fsSL -o "$work/checksums.txt" "$base/checksums.txt"
-names="$(node -e '
+# The release carries archives only (plus checksums.txt covering them), so
+# fetch each platform's archive, verify it, and unpack the binary.
+archives="$(node -e '
   const { PLATFORMS, NAME } = require(process.argv[1] + "/platforms");
   for (const p of PLATFORMS) {
-    console.log(`${NAME}-v${process.argv[2]}-${p.goos}-${p.goarch}${p.goos === "windows" ? ".exe" : ""}`);
+    console.log(`${NAME}-v${process.argv[2]}-${p.goos}-${p.goarch}${p.goos === "windows" ? ".zip" : ".tar.gz"}`);
   }' "$NPM_DIR" "$VERSION")"
-mkdir -p "$work/bin"
-for name in $names; do
-  curl -fsSL -o "$work/bin/$name" "$base/$name"
+mkdir -p "$work/archives" "$work/bin"
+for name in $archives; do
+  curl -fsSL -o "$work/archives/$name" "$base/$name" \
+    || { echo "publish: could not download $base/$name" >&2; exit 1; }
   grep "  $name\$" "$work/checksums.txt" >>"$work/wanted.txt" \
     || { echo "publish: $name is not in checksums.txt" >&2; exit 1; }
 done
-(cd "$work/bin" && shasum -a 256 -c "$work/wanted.txt" >/dev/null) \
+(cd "$work/archives" && shasum -a 256 -c "$work/wanted.txt" >/dev/null) \
   || { echo "publish: checksum mismatch, refusing to publish" >&2; exit 1; }
+for name in $archives; do
+  case "$name" in
+    *.zip) unzip -q -o "$work/archives/$name" -d "$work/bin" ;;
+    *) tar xzf "$work/archives/$name" -C "$work/bin" ;;
+  esac
+done
 
 node "$NPM_DIR/stage-platforms.js" "$VERSION" "$work/bin" "$work/pkgs" >/dev/null
 

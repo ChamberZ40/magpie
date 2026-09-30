@@ -35,8 +35,14 @@ node -e 'for (const p of require(process.argv[1])) console.log(p.goos, p.goarch)
     -ldflags "-s -w -X main.version=v$VERSION -X main.commit=$(git rev-parse --short HEAD)" \
     -o "$WORK/mirror/v$VERSION/magpie-v$VERSION-$goos-$goarch$ext" ./cmd/magpie)
 done
-host="magpie-v$VERSION-$(go env GOOS)-$(go env GOARCH)"
-(cd "$WORK/mirror/v$VERSION" && tar czf "$host.tar.gz" "$host" && shasum -a 256 magpie-* >checksums.txt)
+# Like the real release: archives and checksums.txt only, no raw binaries.
+(cd "$WORK/mirror/v$VERSION" && for f in magpie-*; do
+  case "$f" in
+    *.exe) zip -q "${f%.exe}.zip" "$f" ;;
+    *) tar czf "$f.tar.gz" "$f" ;;
+  esac
+  rm "$f"
+done && shasum -a 256 magpie-* >checksums.txt)
 
 # 2. A release mirror and an empty registry that accepts anonymous-ish publishes.
 python3 -m http.server "$MIRROR_PORT" --bind 127.0.0.1 --directory "$WORK/mirror" \
