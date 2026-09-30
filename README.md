@@ -60,14 +60,13 @@ Either way, you also need an agent CLI that is installed **and logged in** —
 magpie spawns it as a subprocess and inherits its credentials. Then:
 
 ```bash
-magpie                     # writes ~/.magpie/config.toml and exits
+magpie feishu setup        # or: magpie weixin setup — scan the QR code
 ```
 
-Open that file: set `work_dir` to the directory the agent should work in (it
-must already exist), and add your bot credentials — `magpie feishu setup` does
-the Feishu half for you, and `magpie config example` prints every option,
-annotated. Then run `magpie` again and message the bot to confirm the round
-trip works.
+That writes the bot into `~/.magpie/config.toml`, creating the file if needed.
+Open it and set `work_dir` to the directory the agent should work in (it must
+already exist); `magpie config example` prints every option, annotated. Then run
+`magpie` and message the bot to confirm the round trip works.
 
 To enable the Web admin UI once the bridge is running, use `magpie web`, or
 `/web setup` from the chat.
@@ -166,24 +165,35 @@ npm install -g @z40/magpie
 [Releases](https://github.com/ChamberZ40/magpie/releases), unpack it, and put
 `magpie` on your `PATH`.
 
-### 4. First run
+### 4. Connect a chat app
 
 ```bash
-magpie                     # writes ~/.magpie/config.toml and exits
+magpie feishu setup        # Feishu / Lark: scan the QR code, a bot is created for you
+magpie weixin setup        # Weixin (personal WeChat): scan the QR code to link it
 ```
 
-Open that file and set `work_dir` to the directory the agent should work in (it
-must already exist). Then start the bridge for real — this is the process to
-keep running:
+Either one writes the platform into `~/.magpie/config.toml`, creating a starter
+config first if there is none. WeChat Work has no setup command yet: run
+`magpie` once for the starter config, then add the block by hand following
+[docs/wecom.md](docs/wecom.md).
+
+### 5. Set `work_dir` and start
+
+Open `~/.magpie/config.toml` and set `work_dir` to the directory the agent
+should work in (it must already exist). Then start the bridge — this is the
+process to keep running:
 
 ```bash
 magpie
 ```
 
-### 5. Add platform credentials
+Send a message to your bot to confirm. On Weixin, send the first message
+yourself; magpie can only reply once it has seen one.
 
-Either edit `config.toml` by hand — `magpie feishu setup` fills in the Feishu
-half for you — or use the Web UI. The Web UI is off by default; turn it on with:
+### 6. Optional: the Web UI
+
+Once the bridge runs, the Web UI can add more projects and platforms. It is off
+by default; turn it on with:
 
 ```bash
 magpie web                 # enables [management] in config.toml, opens the browser
@@ -191,9 +201,7 @@ magpie web                 # enables [management] in config.toml, opens the brow
 
 The first time, this only writes the config, so restart `magpie` afterwards. The
 UI then lives at `http://localhost:9820` (set `port` under `[management]` to
-move it). Create a project, add a platform (Feishu / WeChat Work / Weixin), and
-paste the credentials from that platform's developer console. Save; Magpie
-hot-reloads. Send a message to your bot to confirm.
+move it). Save; Magpie hot-reloads.
 
 > `magpie web` does not start the bridge. Keep `magpie` itself running.
 

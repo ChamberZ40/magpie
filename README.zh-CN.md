@@ -56,12 +56,12 @@ make build                 # 产物为 ./magpie
 拉起它，并沿用它的登录凭据。然后：
 
 ```bash
-magpie                     # 创建 ~/.magpie/config.toml 后退出
+magpie feishu setup        # 或：magpie weixin setup —— 扫码即可
 ```
 
-打开这个文件：把 `work_dir` 指向你要让 Agent 干活的目录（该目录必须已存在），再填上
-机器人凭据 —— 飞书那半可以用 `magpie feishu setup` 代劳，`magpie config example`
-会打印带注释的全量配置示例。填好后再跑一次 `magpie`，给机器人发条消息确认链路通了。
+它会把机器人写进 `~/.magpie/config.toml`（文件不存在就先创建）。打开这个文件，把
+`work_dir` 指向你要让 Agent 干活的目录（该目录必须已存在）；`magpie config example`
+会打印带注释的全量配置示例。然后跑 `magpie`，给机器人发条消息确认链路通了。
 
 桥跑起来之后想开 Web 管理界面，用 `magpie web`，或在聊天里发 `/web setup`。
 
@@ -157,32 +157,39 @@ npm install -g @z40/magpie
 [Releases](https://github.com/ChamberZ40/magpie/releases) 里挑你平台的压缩包，
 解压后把 `magpie` 放进 `PATH`。
 
-### 4. 首次启动
+### 4. 接入聊天应用
 
 ```bash
-magpie                     # 写出 ~/.magpie/config.toml 后直接退出
+magpie feishu setup        # 飞书 / Lark：扫码，自动帮你建好机器人
+magpie weixin setup        # 微信（个人号）：扫码关联
 ```
 
-打开这个文件，把 `work_dir` 设成 Agent 要工作的目录（目录必须已存在）。然后正式
-启动桥接服务——之后要一直跑着的就是这个进程：
+两者都会把平台写进 `~/.magpie/config.toml`，没有配置文件时会先生成一份起步配置。
+企业微信暂时没有 setup 命令：先跑一次 `magpie` 生成起步配置，再按
+[docs/wecom.md](docs/wecom.md) 手动加上平台配置。
+
+### 5. 设置 `work_dir` 并启动
+
+打开 `~/.magpie/config.toml`，把 `work_dir` 设成 Agent 要工作的目录（目录必须已存在）。
+然后启动桥接服务——之后要一直跑着的就是这个进程：
 
 ```bash
 magpie
 ```
 
-### 5. 填平台凭据
+给机器人发条消息验证一下。微信需要你先发第一条消息，magpie 收到过消息后才能回复。
 
-可以直接改 `config.toml`——飞书那部分用 `magpie feishu setup` 帮你填——也可以用
-Web UI。Web UI 默认是关的，用下面的命令打开：
+### 6. 可选：Web UI
+
+桥跑起来之后，可以用 Web UI 再加项目和平台。它默认是关的，用下面的命令打开：
 
 ```bash
 magpie web                 # 在 config.toml 里启用 [management]，并打开浏览器
 ```
 
 第一次执行只会写配置，所以之后要重启 `magpie`。Web UI 地址是
-`http://localhost:9820`（想换端口，在 `[management]` 下设 `port`）。在里面建项目、
-加平台（飞书 / 企业微信 / 微信），把该平台开发者后台的凭据粘进去。保存后 Magpie
-会热重载。给机器人发条消息验证一下。
+`http://localhost:9820`（想换端口，在 `[management]` 下设 `port`）。保存后 Magpie
+会热重载。
 
 > `magpie web` **不会**启动桥接服务，`magpie` 本身得单独跑着。
 

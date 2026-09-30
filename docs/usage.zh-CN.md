@@ -486,7 +486,7 @@ magpie weixin new --project my-project
 
 - `--project` 不存在时会自动创建项目；项目里没有 `weixin` 平台时会自动追加一块 `[[projects.platforms]]`。
 - 扫码成功后会写入 `token`，以及网关返回的 `base_url`（若有）、`ilink_bot_id` → `account_id` 等。
-- 默认 `--set-allow-from-empty=true`：若 `allow_from` 为空，会用扫码用户的 ilink ID 预填，便于收紧权限。
+- 加上 `--set-allow-from-empty`（默认关闭）时，若 `allow_from` 为空，会用扫码用户的 ilink ID 预填，便于收紧权限。
 - 绑定时默认调用 `getUpdates` 校验 Token；可用 `--skip-verify` 跳过。
 - 首次使用后请在微信里 **先发一条消息**，以便缓存 `context_token`，否则可能无法回复。
 

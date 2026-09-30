@@ -27,7 +27,7 @@ magpie weixin setup --project my-project
 1. **二维码**（终端 ASCII）以及 **可复制的 URL**（手机微信打开或扫码均可，取决于网关返回的链接形式）  
 2. 按提示在手机上 **确认登录**  
 3. 成功后，命令会把 **`token`（Bearer）**、**`base_url`**（若网关返回）、**`account_id`（ilink_bot_id）** 等写回 `config.toml`  
-4. 若当前 `allow_from` 为空且你使用了 `--set-allow-from-empty`（默认开启），会尝试填入扫码关联的 **微信用户 ID**，便于限制谁可以使用机器人
+4. 若当前 `allow_from` 为空且你加了 `--set-allow-from-empty`（默认关闭），会尝试填入扫码关联的 **微信用户 ID**，便于限制谁可以使用机器人
 
 ### 命令对照
 
