@@ -98,23 +98,18 @@ type = "claudecode"
 
 [projects.agent.options]
 # The directory the agent works in. It must exist — magpie will not create it.
-work_dir = "/path/to/your/project"
+work_dir = "%s"
 mode = "default"
 # model = "claude-sonnet-4-20250514"
 
-# --- Choose at least one platform below. This build ships: %s ---
-
-# Feishu / Lark (WebSocket, no public IP needed).
-# Run 'magpie feishu setup' to fill these in without leaving the terminal.
-[[projects.platforms]]
-type = "feishu"
-
-[projects.platforms.options]
-app_id = "your-feishu-app-id"
-app_secret = "your-feishu-app-secret"
-
+# --- Platforms (at least one is required) ---
+# This build ships: %s
+# The easiest way to add one is a setup command. It shows a QR code to scan,
+# then writes the [[projects.platforms]] block into this file for you:
+%s
 # Every option, annotated: magpie config example
-`, quotedNames(core.ListRegisteredAgents()), quotedNames(core.ListRegisteredPlatforms()))
+`, quotedNames(core.ListRegisteredAgents()), placeholderWorkDir,
+		quotedNames(core.ListRegisteredPlatforms()), indentedSetupCommands("#   "))
 }
 
 // usageText builds the --help output. It is separate from printUsage so tests

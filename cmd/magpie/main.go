@@ -309,8 +309,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error creating config: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Created default config at %s\n", configPath)
-		fmt.Println("Please edit this file to add your agent and platform credentials, then run magpie again.")
+		fmt.Print(firstRunGuide(configPath))
 		os.Exit(0)
 	}
 
@@ -1575,6 +1574,16 @@ func bootstrapConfig(path string) error {
 // Every command it names must exist — it used to point at `magpie init`,
 // which does not, so the one instruction a stuck user was given failed.
 func configLoadErrorHint(configPath string, err error) string {
+	if errors.Is(err, config.ErrNoPlatforms) && len(setupCommands()) > 0 {
+		return fmt.Sprintf(`Error loading config (%s): %v
+
+Connect a chat app first. Each command shows a QR code to scan, then writes
+the platform into that file:
+
+%s
+Then run magpie again.
+`, configPath, err, indentedSetupCommands(""))
+	}
 	return fmt.Sprintf(`Error loading config (%s): %v
 
 Fix that file, then run magpie again. For a complete annotated example of

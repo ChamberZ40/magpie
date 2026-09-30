@@ -121,6 +121,7 @@ func runFeishuSetup(args []string, requestedMode string) {
 	_ = fs.Parse(args)
 
 	initConfigPath(*configFile)
+	bootstrapConfigForSetup(config.ConfigPath)
 
 	effectiveMode, resolvedAppID, resolvedAppSecret, err := resolveFeishuSetupInputs(
 		requestedMode,
@@ -232,6 +233,8 @@ func runFeishuSetup(args []string, requestedMode string) {
 	printBotMenuGuidance(saveResult.PlatformType)
 
 	fmt.Println("提醒：扫码新建通常会自动预配权限与事件订阅；请在开放平台核验发布状态与可用范围。")
+	fmt.Println()
+	printSetupNextSteps(config.ConfigPath, saveResult.ProjectName)
 }
 
 func printAllowFromGuidance(appID, appSecret, ownerOpenID string, result *config.FeishuCredentialUpdateResult) {

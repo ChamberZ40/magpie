@@ -48,8 +48,8 @@ func TestDefaultConfigTemplate_NamesOnlyRegisteredPlatforms(t *testing.T) {
 	}
 }
 
-// The example blocks carry real option keys (app_id, app_secret), so they only
-// make sense if the build actually has that agent and platform compiled in.
+// The agent block is active, so its type must be compiled into this build.
+// (Platforms are left to the setup commands; see onboarding_test.go.)
 func TestDefaultConfigTemplate_ExampleTypesAreRegistered(t *testing.T) {
 	tmpl := defaultConfigTemplate()
 
@@ -58,7 +58,6 @@ func TestDefaultConfigTemplate_ExampleTypesAreRegistered(t *testing.T) {
 		registered []string
 	}{
 		{"agent", core.ListRegisteredAgents()},
-		{"platform", core.ListRegisteredPlatforms()},
 	} {
 		want := exampleTypeFor(t, tmpl, tc.kind)
 		if !contains(tc.registered, want) {
@@ -108,8 +107,7 @@ func contains(haystack []string, needle string) bool {
 func exampleTypeFor(t *testing.T, tmpl, kind string) string {
 	t.Helper()
 	headers := map[string]string{
-		"agent":    "[projects.agent]",
-		"platform": "[[projects.platforms]]",
+		"agent": "[projects.agent]",
 	}
 	_, after, ok := strings.Cut(tmpl, headers[kind])
 	if !ok {

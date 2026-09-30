@@ -89,10 +89,7 @@ func runWeixinSetup(args []string, requestedMode string) {
 	_ = fs.Parse(args)
 
 	initConfigPath(*configFile)
-	if _, err := os.Stat(config.ConfigPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: config file not found at %s (%v)\n", config.ConfigPath, err)
-		os.Exit(1)
-	}
+	bootstrapConfigForSetup(config.ConfigPath)
 
 	effectiveMode, err := resolveWeixinSetupMode(requestedMode, strings.TrimSpace(*token))
 	if err != nil {
@@ -206,6 +203,9 @@ func runWeixinSetup(args []string, requestedMode string) {
 		fmt.Printf("   allow_from: %s\n", saveResult.AllowFrom)
 	}
 	fmt.Println()
+	if note := workDirReminder(config.ConfigPath, saveResult.ProjectName); note != "" {
+		fmt.Println("⚠️  " + note)
+	}
 	fmt.Println("Next: run magpie (or restart the daemon) and send a message from WeChat to finish linking context_token.")
 }
 

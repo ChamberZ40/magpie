@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -729,6 +730,11 @@ func load(path string) (*Config, error) {
 	return cfg, nil
 }
 
+// ErrNoPlatforms reports a project with no [[projects.platforms]] entry. It is
+// exported so the CLI can point the user at a setup command instead of only
+// echoing the rule.
+var ErrNoPlatforms = errors.New("needs at least one [[projects.platforms]]")
+
 // LoadPermissive loads the config file and performs all validation except the
 // "at least one platform per project" check. Use this for commands (like
 // `magpie web`) that should work even before platforms are configured.
@@ -1175,7 +1181,7 @@ func (c *Config) validateInternal(permissive bool) error {
 			return fmt.Errorf("config: %s.agent.type is required", prefix)
 		}
 		if len(proj.Platforms) == 0 && !permissive {
-			return fmt.Errorf("config: %s needs at least one [[projects.platforms]]", prefix)
+			return fmt.Errorf("config: %s %w", prefix, ErrNoPlatforms)
 		}
 		for j, p := range proj.Platforms {
 			if p.Type == "" {
