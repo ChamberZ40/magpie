@@ -44,7 +44,7 @@ func TestSetupCommands_OnlyRealCommandsForRegisteredPlatforms(t *testing.T) {
 	for _, cmd := range cmds {
 		assertRealCommand(t, cmd)
 		name := strings.Fields(cmd)[1]
-		if !registered[name] && !(name == "feishu" && registered["lark"]) {
+		if !registered[name] && (name != "feishu" || !registered["lark"]) {
 			t.Errorf("%q offered, but platform %q is not in this build", cmd, name)
 		}
 	}
